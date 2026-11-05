@@ -1,0 +1,14 @@
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+.build/
+.swiftpm/
+
+# Personal agent setup: third-party skills and local tool config stay out of the repository.
+.agents/
+.claude/
+.codex/
+.mcp.json
+skills-lock.json
