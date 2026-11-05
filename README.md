@@ -9,6 +9,13 @@ account you switch to, like passing a baton.
 > Anthropic. It relies on how Claude Desktop stores its data, which is
 > undocumented and can change with any update.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/panel-dark.png">
+    <img src="docs/images/panel-light.png" alt="The menu bar panel: the signed-in account on top with its email, and two other accounts below, each with Session and Week usage bars; one account's session limit is reached and shown in red with its reset time." width="300">
+  </picture>
+</p>
+
 ## What it does
 
 - **One-click switching.** Pick an account in the menu bar panel. Claude quits,
@@ -24,8 +31,19 @@ account you switch to, like passing a baton.
   until it resets.
 - **Asks before stopping work.** If a Code session was active in the last two
   minutes, switching asks first, because restarting Claude stops running work.
+  If a switch fails, you can put the previous account back in one click.
 - **Signed-in account first.** The panel shows the signed-in account on top and
   the accounts you can switch to below.
+
+<p align="center">
+  <img src="docs/images/alert-confirm.png" alt="Alert asking to confirm a switch while two sessions are working, with Cancel and Switch buttons." width="260">
+  &nbsp;
+  <img src="docs/images/alert-failed.png" alt="Alert reporting a failed switch, with a Put Back button for the previous account." width="260">
+</p>
+
+It lives in the menu bar as a baton:
+<img src="docs/images/menubar-light.png" alt="Baton icon on a light menu bar" height="24">
+<img src="docs/images/menubar-dark.png" alt="Baton icon on a dark menu bar" height="24">
 
 ## Requirements
 
@@ -36,11 +54,13 @@ account you switch to, like passing a baton.
 
 Download `ClaudeDesktopBaton-<version>.zip` from
 [Releases](../../releases), unzip it, and move **Claude Desktop Baton** to
-Applications. The app is signed with a Developer ID and notarized by Apple.
+Applications. The app is signed with a Developer ID and notarized by Apple,
+so it opens without a Gatekeeper warning.
 
 On first launch:
 
-1. The app starts at login by default; turn this off in the panel's `⋯` menu.
+1. Click the baton in the menu bar to open the panel. The app starts at login
+   by default; turn this off in the panel's `⋯` menu.
 2. The account Claude is signed in to is saved automatically. For each other
    account, choose **Add account**: Claude reopens signed out on this Mac only,
    you sign in, and it is saved.
