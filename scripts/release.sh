@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds a Developer ID–signed, notarized and stapled app, zipped for a GitHub Release.
+# Builds a Developer ID–signed, notarized and stapled app, as a zip and a DMG for a GitHub Release.
 #   scripts/release.sh
 # Needs a "Developer ID Application" identity and a notarytool keychain profile, created once with:
 #   xcrun notarytool store-credentials claude-desktop-baton --team-id <TEAM_ID>
@@ -24,5 +24,21 @@ spctl --assess --type execute --verbose "$APP"
 
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
-shasum -a 256 "$ZIP"
-echo "Release archive: $ZIP"
+
+# DMG: the stapled app beside an Applications shortcut, itself signed, notarized and stapled.
+DMG="build/ClaudeDesktopBaton-$VERSION.dmg"
+STAGE="build/dmg"
+rm -rf "$STAGE" "$DMG"
+mkdir -p "$STAGE"
+ditto "$APP" "$STAGE/$NAME.app"
+ln -s /Applications "$STAGE/Applications"
+hdiutil create -volname "$NAME" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG"
+codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
+xcrun stapler staple "$DMG"
+xcrun stapler validate "$DMG"
+spctl --assess --type open --context context:primary-signature --verbose "$DMG"
+rm -rf "$STAGE"
+
+shasum -a 256 "$ZIP" "$DMG"
+echo "Release archives: $ZIP $DMG"

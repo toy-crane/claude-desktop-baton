@@ -58,8 +58,8 @@ It lives in the menu bar as a baton:
 
 ## Install
 
-Download `ClaudeDesktopBaton-<version>.zip` from
-[Releases](../../releases), unzip it, and move **Claude Desktop Baton** to
+Download `ClaudeDesktopBaton-<version>.dmg` from
+[Releases](../../releases), open it, and drag **Claude Desktop Baton** to
 Applications. The app is signed with a Developer ID and notarized by Apple,
 so it opens without a Gatekeeper warning.
 
