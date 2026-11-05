@@ -56,19 +56,18 @@ func renderSnapshots(to folder: URL) {
         ("alert-failed", Alerts.switchFailed(to: "Acme · jordan", message: "Claude opened a different account. The saved sign-in may have expired; sign in to it in Claude and it is saved again.", putBack: "Acme · alex")),
         ("alert-sync", Alerts.syncSkipped(to: "Acme · sam", reason: "only 0 of 2 session files look familiar")),
     ]
+    // Each alert in light and dark for the README. NSAlert ignores dark mode when drawn off screen,
+    // so this draws the same text in the macOS alert layout with SwiftUI.
     for (name, content) in alerts {
-        let alert = NSAlert()
-        alert.icon = AppIcon.image(size: 128)
-        alert.messageText = content.title
-        alert.informativeText = content.message
-        content.buttons.forEach { alert.addButton(withTitle: $0) }
-        alert.layout()
-        guard let view = alert.window.contentView,
-              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
-        view.cacheDisplay(in: view.bounds, to: rep)
-        let file = folder.appendingPathComponent("\(name).png")
-        try? rep.representation(using: .png, properties: [:])?.write(to: file)
-        print(file.path)
+        for scheme in [ColorScheme.light, .dark] {
+            let renderer = ImageRenderer(content: AlertCard(content: content).environment(\.colorScheme, scheme))
+            renderer.scale = 2
+            guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
+                  let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { continue }
+            let file = folder.appendingPathComponent("\(name)-\(scheme == .dark ? "dark" : "light").png")
+            try? png.write(to: file)
+            print(file.path)
+        }
     }
     for (name, state) in cases {
         for scheme in [ColorScheme.light, .dark] {
@@ -81,5 +80,40 @@ func renderSnapshots(to folder: URL) {
             try? png.write(to: file)
             print(file.path)
         }
+    }
+}
+
+/// A macOS-style alert drawn in SwiftUI, used only for README images.
+struct AlertCard: View {
+    let content: AlertContent
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let dark = scheme == .dark
+        VStack(alignment: .leading, spacing: 0) {
+            if let icon = AppIcon.image(size: 128) {
+                Image(nsImage: icon).resizable().frame(width: 64, height: 64).padding(.bottom, 14)
+            }
+            Text(content.title).font(.system(size: 13, weight: .bold)).padding(.bottom, 8)
+            Text(content.message).font(.system(size: 13)).fixedSize(horizontal: false, vertical: true).padding(.bottom, 16)
+            let buttons = content.buttons
+            if buttons.count == 2 && buttons.allSatisfy({ $0.count < 12 }) {
+                HStack(spacing: 8) { ForEach(buttons.reversed(), id: \.self) { button($0, dark) } }
+            } else {
+                VStack(spacing: 8) { ForEach(buttons, id: \.self) { button($0, dark) } }
+            }
+        }
+        .foregroundStyle(dark ? Color.white : Color.black)
+        .padding(20)
+        .frame(width: 260, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16).fill(dark ? Color(white: 0.17) : Color(white: 0.97)))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(dark ? Color.white.opacity(0.14) : Color.black.opacity(0.12), lineWidth: 1))
+        .padding(10)
+    }
+
+    private func button(_ title: String, _ dark: Bool) -> some View {
+        Text(title).font(.system(size: 13))
+            .frame(maxWidth: .infinity).padding(.vertical, 6)
+            .background(Capsule().fill(dark ? Color.white.opacity(0.14) : Color.black.opacity(0.07)))
     }
 }

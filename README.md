@@ -36,9 +36,15 @@ account you switch to, like passing a baton.
   the accounts you can switch to below.
 
 <p align="center">
-  <img src="docs/images/alert-confirm.png" alt="Alert asking to confirm a switch while two sessions are working, with Cancel and Switch buttons." width="260">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/alert-confirm-dark.png">
+    <img src="docs/images/alert-confirm-light.png" alt="Alert asking to confirm a switch while two sessions are working, with Cancel and Switch buttons." width="260">
+  </picture>
   &nbsp;
-  <img src="docs/images/alert-failed.png" alt="Alert reporting a failed switch, with a Put Back button for the previous account." width="260">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/alert-failed-dark.png">
+    <img src="docs/images/alert-failed-light.png" alt="Alert reporting a failed switch, with a Put Back button for the previous account." width="260">
+  </picture>
 </p>
 
 It lives in the menu bar as a baton:
