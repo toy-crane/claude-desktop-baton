@@ -37,7 +37,8 @@ final class PanelModel {
     var state: PanelState {
         PanelState.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now, cli: cliState, cliSaved: cliSaved)
     }
-    var isBusy: Bool { state.busy }
+    /// A switch, an account add, or an update about to quit the app: no new switch may start.
+    var isBusy: Bool { state.busy || updater.isInstalling }
     var menuBar: MenuBarLabel {
         MenuBarLabel.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now)
     }

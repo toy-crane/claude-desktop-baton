@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import BatonCore
 
@@ -106,5 +107,37 @@ struct UpdateGateTests {
     // Risk: adding an account leaves Claude signed out while the app waits for the sign-in; a restart loses that wait.
     @Test func neverWhileAnAddedAccountIsBeingSignedIn() {
         #expect(!UpdateGate.mayRelaunch(phase: .adding, alertOpen: false))
+    }
+}
+
+@Suite("Update install in progress")
+struct UpdateInstallTests {
+    let start = Date(timeIntervalSince1970: 1_793_000_000)
+
+    @Test func nothingIsInProgressBeforeAnInstallIsLetThrough() {
+        #expect(!UpdateInstall().isActive(at: start))
+    }
+
+    // PR review: after the relaunch is allowed Sparkle terminates the app asynchronously, so a switch
+    // started in that gap would be cut off; new switches are refused while the install is in progress.
+    @Test func anInstallLetThroughIsInProgressUntilTheAppQuits() {
+        var install = UpdateInstall()
+        install.began(at: start)
+        #expect(install.isActive(at: start.addingTimeInterval(30)))
+    }
+
+    @Test func anAbortedInstallNoLongerBlocksSwitches() {
+        var install = UpdateInstall()
+        install.began(at: start)
+        install.aborted()
+        #expect(!install.isActive(at: start.addingTimeInterval(1)))
+    }
+
+    // Risk: if Sparkle never terminates the app and reports nothing, switching must not stay blocked forever.
+    @Test func anInstallThatNeverFinishesStopsBlockingAfterTwoMinutes() {
+        var install = UpdateInstall()
+        install.began(at: start)
+        #expect(install.isActive(at: start.addingTimeInterval(119)))
+        #expect(!install.isActive(at: start.addingTimeInterval(121)))
     }
 }

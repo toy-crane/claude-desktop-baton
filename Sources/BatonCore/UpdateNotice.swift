@@ -50,3 +50,22 @@ public enum UpdateGate {
         phase == .idle && !alertOpen
     }
 }
+
+/// An update the app has let go ahead: from then until the app quits, Sparkle may terminate it at any
+/// moment, so no new switch or account add may start. Cleared if the install aborts; expires in case
+/// the app is never terminated.
+public struct UpdateInstall: Equatable, Sendable {
+    public static let expiry: TimeInterval = 120
+    private var since: Date?
+
+    public init() {}
+
+    public mutating func began(at date: Date) { since = date }
+
+    public mutating func aborted() { since = nil }
+
+    public func isActive(at date: Date) -> Bool {
+        guard let since else { return false }
+        return date.timeIntervalSince(since) < Self.expiry
+    }
+}

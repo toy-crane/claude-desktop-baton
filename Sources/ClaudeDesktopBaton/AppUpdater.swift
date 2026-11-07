@@ -14,6 +14,11 @@ final class AppUpdater: NSObject {
     @ObservationIgnored private var controller: SPUStandardUpdaterController?
     /// Sparkle's go-ahead to relaunch (or to install a silently downloaded update), held while a switch runs.
     @ObservationIgnored private var heldRelaunch: (() -> Void)?
+    /// Set once an install is let through: Sparkle then quits the app on its own schedule.
+    @ObservationIgnored private var install = UpdateInstall()
+
+    /// An update has been let through and the app may quit any moment; no switch may start now.
+    var isInstalling: Bool { install.isActive(at: Date()) }
 
     /// Starts the updater and checks once now; Sparkle then checks about once a day.
     /// A build without a feed (`swift run`, an unbundled binary) has no updater.
@@ -37,6 +42,7 @@ final class AppUpdater: NSObject {
     func resumeIfAllowed() {
         guard let relaunch = heldRelaunch, mayRelaunch() else { return }
         heldRelaunch = nil
+        install.began(at: Date())
         relaunch()
     }
 }
@@ -56,9 +62,17 @@ extension AppUpdater: SPUUpdaterDelegate {
         notice.noUpdateFound()
     }
 
+    func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
+        install.aborted()
+    }
+
     func updater(_ updater: SPUUpdater, shouldPostponeRelaunchForUpdate item: SUAppcastItem,
                  untilInvokingBlock installHandler: @escaping () -> Void) -> Bool {
-        guard !mayRelaunch() else { return false }
+        guard !mayRelaunch() else {
+            // Sparkle hands the install to its helper and quits the app later, without asking again.
+            install.began(at: Date())
+            return false
+        }
         heldRelaunch = installHandler
         return true
     }
