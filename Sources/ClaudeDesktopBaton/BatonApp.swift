@@ -18,13 +18,17 @@ struct BatonApp: App {
                 about: model.showAbout, quit: model.quit))
             .onAppear { model.panelOpened() }
         } label: {
-            if model.isBusy {
+            switch model.menuBar {
+            case .switching:
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .symbolEffect(.rotate, isActive: true)
                     .accessibilityLabel("Claude Desktop Baton: switching")
-            } else {
+            case .icon:
                 Image(nsImage: AppIcon.menuBar)
                     .accessibilityLabel("Claude Desktop Baton")
+            case .usage(let usage):
+                Image(nsImage: MenuBarMeter.image(usage))
+                    .accessibilityLabel(usage.accessibility)
             }
         }
         .menuBarExtraStyle(.window)
