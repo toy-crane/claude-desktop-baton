@@ -55,9 +55,11 @@ account you switch to, like passing a baton.
   </picture>
 </p>
 
-It lives in the menu bar as a baton:
-<img src="docs/images/menubar-light.png" alt="Baton icon on a light menu bar" height="24">
-<img src="docs/images/menubar-dark.png" alt="Baton icon on a dark menu bar" height="24">
+In the menu bar it shows the signed-in account's usage: a two-bar meter
+(Session on top, Week below) and the Session percent. When a limit is
+reached, the percent becomes the time until you can use Claude again.
+<img src="docs/images/menubar-light.png" alt="Usage meter and 42% on a light menu bar" height="24">
+<img src="docs/images/menubar-dark.png" alt="Usage meter and 42% on a dark menu bar" height="24">
 
 ## Requirements
 
@@ -73,7 +75,7 @@ so it opens without a Gatekeeper warning.
 
 On first launch:
 
-1. Click the baton in the menu bar to open the panel. The app starts at login
+1. Click the item in the menu bar to open the panel. The app starts at login
    by default; turn this off in the panel's `⋯` menu.
 2. The account Claude is signed in to is saved automatically. For each other
    account, choose **Add account**: Claude reopens signed out on this Mac only,
