@@ -20,7 +20,9 @@ enum MenuBarMeter {
             .font: font, .foregroundColor: NSColor.black.withAlphaComponent(strength),
         ])
         let textSize = text.size()
-        let size = NSSize(width: meterWidth + spacing + ceil(textSize.width), height: height)
+        // At least as wide as "100%", so the item does not shift as the percent changes; a reset time may widen it.
+        let widest = NSAttributedString(string: "100%", attributes: [.font: font]).size().width
+        let size = NSSize(width: meterWidth + spacing + ceil(max(textSize.width, widest)), height: height)
         let image = NSImage(size: size, flipped: false) { _ in
             let top: CGFloat = 5, bottom: CGFloat = 1.5, gap: CGFloat = 2
             let base = (height - (top + gap + bottom)) / 2
