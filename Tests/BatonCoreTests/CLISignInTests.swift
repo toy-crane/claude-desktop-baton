@@ -173,6 +173,44 @@ struct CLISignInTests {
         #expect(!fm.fileExists(atPath: x.paths.configLock.path))
     }
 
+    // AC6 / review: a refresh that finishes while the switch waits for the lock is the one saved for A.
+    @Test func aRefreshThatFinishesDuringTheWaitIsTheTokenSaved() async throws {
+        let (x, a, b) = try CLIFixture.twoAccountsWithCLI()
+        try FileManager.default.createDirectory(at: x.paths.refreshLock, withIntermediateDirectories: false)
+        let lock = x.paths.refreshLock
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) {
+            try? x.cliSignIn(A, token: "A-rotated")
+            try? FileManager.default.removeItem(at: lock)
+        }
+
+        #expect(x.cli.follow(b) == .moved)
+        #expect(x.cli.follow(a) == .moved)
+
+        #expect(x.cliRefreshToken == "rt-A-rotated")
+    }
+
+    // Review: an item that is not JSON must not be replaced by one holding only the login.
+    @Test func anUnreadableCLIItemIsLeftAlone() throws {
+        let (x, _, b) = try CLIFixture.twoAccountsWithCLI()
+        let unreadable = Data("not json".utf8)
+        x.credentials.item.set(unreadable)
+
+        let result = x.cli.follow(b)
+
+        guard case .failed = result else { Issue.record("expected a failure, got \(result)"); return }
+        #expect(x.credentials.item.get() == unreadable)
+        #expect(x.cliAccount == A)
+    }
+
+    // Review: `security -w` prints a value as hex when it holds bytes it deems unprintable.
+    @Test func aHexPrintedItemIsReadAsItsJSON() {
+        let json = Data(#"{"claudeAiOauth":{"refreshToken":"rt-é"}}"#.utf8)
+        let hex = Data(json.map { String(format: "%02x", $0) }.joined().utf8)
+
+        #expect(SecurityCLICredentials.decode(hex) == json)
+        #expect(SecurityCLICredentials.decode(json) == json)
+    }
+
     // AC6: a refresh that outlasts the wait leaves the CLI and its lock alone.
     @Test func aLockHeldPastTheWaitLeavesTheCLIUnchanged() throws {
         let (x, _, b) = try CLIFixture.twoAccountsWithCLI()

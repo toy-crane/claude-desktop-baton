@@ -97,13 +97,18 @@ public final class CLIAccounts: @unchecked Sendable {
     /// Re-saves the outgoing CLI sign-in, then puts the target's in place under Claude Code's own locks,
     /// so a refresh in a running CLI cannot write the old account back.
     public func follow(_ target: SavedAccount) -> CLIFollow {
-        saveCurrent()
         let state = current()
         guard let data = saved.load(target.accountId),
               let entry = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let login = entry[Self.loginKey] as? [String: Any], let account = entry[Self.accountKey] as? [String: Any]
-        else { return .notSaved(cli: state) }
-        if state.identity == target.identity { return .alreadyThere }
+        else {
+            saveCurrent()
+            return .notSaved(cli: state)
+        }
+        if state.identity == target.identity {
+            saveCurrent()
+            return .alreadyThere
+        }
 
         // The same order Claude Code takes them: the refresh lock, then the legacy one; then the config lock.
         let locks = [(paths.refreshLock, 60.0), (paths.legacyRefreshLock, 60.0), (paths.configLock, 10.0)]
@@ -115,10 +120,19 @@ public final class CLIAccounts: @unchecked Sendable {
             }
             held.append(lock)
         }
+        // Saved under the locks, so a refresh that finished while this waited is the token kept.
+        saveCurrent()
 
         let previousItem: Data?
         do { previousItem = try credentials.read() } catch { return .failed("The CLI's Keychain item could not be read.") }
-        var item = previousItem.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+        var item: [String: Any] = [:]
+        if let previousItem {
+            // The item also holds the CLI's MCP tokens; one that cannot be read is never replaced.
+            guard let parsed = (try? JSONSerialization.jsonObject(with: previousItem)) as? [String: Any] else {
+                return .failed("The CLI's Keychain item is in a format this app does not know, so it was left alone.")
+            }
+            item = parsed
+        }
         guard var config = readConfig() else { return .failed("~/.claude.json could not be read.") }
         item[Self.loginKey] = login
         config[Self.accountKey] = account
@@ -207,7 +221,22 @@ public struct SecurityCLICredentials: CLICredentialStore {
         guard result.status == 0 else { throw BatonError("The CLI's Keychain item could not be read (\(result.status)).") }
         var output = result.output
         while output.last == 0x0A { output.removeLast() }
-        return output
+        return Self.decode(output)
+    }
+
+    /// `security -w` prints the value itself, or hex when it holds bytes it deems unprintable.
+    static func decode(_ output: Data) -> Data {
+        guard output.first != UInt8(ascii: "{"), output.count % 2 == 0,
+              let text = String(data: output, encoding: .ascii), text.allSatisfy(\.isHexDigit) else { return output }
+        var bytes = Data(capacity: output.count / 2)
+        var index = text.startIndex
+        while index < text.endIndex {
+            let next = text.index(index, offsetBy: 2)
+            guard let byte = UInt8(text[index..<next], radix: 16) else { return output }
+            bytes.append(byte)
+            index = next
+        }
+        return bytes
     }
 
     public func write(_ data: Data) throws {
