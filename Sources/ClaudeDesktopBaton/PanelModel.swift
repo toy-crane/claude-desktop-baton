@@ -64,7 +64,12 @@ final class PanelModel {
         tick()
         refreshCLI()
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+            Task { @MainActor in
+                // A held update relaunch goes ahead only from this timer, never from tick() itself: a switch
+                // calls tick() as it ends, before its result alert (and Put Back) is shown.
+                self?.updater.resumeIfAllowed()
+                self?.tick()
+            }
         }
     }
 
@@ -72,9 +77,6 @@ final class PanelModel {
 
     func tick() {
         now = Date()
-        // A held update relaunch goes ahead here, never straight from an alert's return: the code after
-        // "Put Back" starts the next switch before this timer fires again.
-        updater.resumeIfAllowed()
         guard !isBusy || phase == .adding else { return }
         current = ClaudeLog.current(claude.log)
         switcher.saveCurrentIfNew()
