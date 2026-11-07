@@ -35,6 +35,10 @@ public struct AppPaths: Sendable {
     public var previousSignIn: URL { root.appendingPathComponent("previous.json") }
     public var staging: URL { root.appendingPathComponent("staging") }
     public var trash: URL { root.appendingPathComponent("trash") }
+    /// Usage last fetched per account, shared with the command line. No credentials.
+    public var usageCache: URL { root.appendingPathComponent("usage.json") }
+    /// Where the menu bar app listens for switches asked for on the command line.
+    public var controlSocket: URL { root.appendingPathComponent("control.sock") }
 
     public init(root: URL) { self.root = root }
 

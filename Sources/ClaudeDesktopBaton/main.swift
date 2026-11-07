@@ -3,23 +3,23 @@ import BatonCore
 
 let arguments = CommandLine.arguments
 
-// --status: what a switch would do right now, read-only. Prints no credentials.
-if arguments.contains("--status") {
-    let claude = ClaudePaths.live, paths = AppPaths.live
-    let store = AccountStore(paths: paths)
-    let current = ClaudeLog.current(claude.log)
-    let accounts = store.all()
-    let names = displayNames(accounts)
-    let switcher = Switcher(claude: claude, paths: paths, store: store, app: LiveClaude())
-    print("Claude running: \(LiveClaude().isRunning)")
-    print("Signed in: \(current.map { names[$0.account] ?? "unsaved account \($0.account.prefix(8))" } ?? "nobody")")
-    print("Saved accounts (\(accounts.count)):")
-    for account in accounts { print("  \(account.accountId == current?.account ? "●" : " ") \(names[account.accountId]!)") }
-    print("Legacy accounts available to import: \((try? FileManager.default.contentsOfDirectory(atPath: AppPaths.legacyAccounts.path).filter { $0.hasSuffix(".json") }.count) ?? 0)")
-    print("Sessions working in the last 2 minutes: \(switcher.workingSessions())")
-    let preview = SessionSync.run(paths.syncLocations(claude), preview: true)
-    print("A switch now would sync: \(preview.summary)\(preview.notes.isEmpty ? "" : " (\(preview.notes.count) records left alone)")")
-    exit(0)
+// The command line for agents and scripts: `claude-desktop-baton <command>` through the PATH link,
+// or the app's executable with a command. `--status` is kept from before and means `status`.
+let invokedAsCommand = URL(fileURLWithPath: arguments[0]).lastPathComponent == AgentCommand.commandName
+let commandArguments = arguments.dropFirst().map { $0 == "--status" ? "status" : $0 }
+if invokedAsCommand || commandArguments.first.map(AgentCommand.names.contains) == true {
+    let finished = DispatchSemaphore(value: 0)
+    nonisolated(unsafe) var output = AgentOutput(text: "", code: AgentCommand.Exit.error)
+    Task.detached {
+        output = await AgentCommand.run(Array(commandArguments), LiveAgent.context())
+        finished.signal()
+    }
+    finished.wait()
+    let text = output.text.hasSuffix("\n") || output.text.isEmpty ? output.text : output.text + "\n"
+    // JSON always goes to stdout so agents can parse it; plain-text errors go to stderr.
+    let toStdout = output.code == 0 || commandArguments.contains("--json")
+    FileHandle(fileDescriptor: toStdout ? STDOUT_FILENO : STDERR_FILENO).write(Data(text.utf8))
+    exit(output.code)
 }
 
 // --snapshot <dir>: renders the panel in its main states, for review.

@@ -84,6 +84,23 @@ public enum Alerts {
         message: "Claude reopened signed out on this Mac. Sign in to another account in Claude; it is saved automatically.",
         buttons: ["OK"])
 
+    public static func commandLineInstalled(onPath: Bool?) -> AlertContent {
+        let message: String
+        switch onPath {
+        case true?:
+            message = "Agents and scripts can now run `claude-desktop-baton help` in a new terminal."
+        case false?:
+            message = "~/.local/bin is not on your PATH, so terminals will not find it yet. Add this line to your shell profile (for example ~/.zshrc), then open a new terminal:\n\nexport PATH=\"$HOME/.local/bin:$PATH\""
+        case nil:
+            message = "It is in ~/.local/bin. If a new terminal cannot find `claude-desktop-baton`, add this line to your shell profile:\n\nexport PATH=\"$HOME/.local/bin:$PATH\""
+        }
+        return AlertContent(title: "Command line tool installed", message: message, buttons: ["OK"])
+    }
+
+    public static func commandLineFailed(_ message: String) -> AlertContent {
+        AlertContent(title: "Couldn't install the command line tool", message: message, buttons: ["OK"])
+    }
+
     public static func confirmRemove(_ name: String) -> AlertContent {
         AlertContent(title: "Remove \(name)?",
                      message: "Only its saved sign-in is deleted from Claude Desktop Baton. Claude and your sessions are not changed.",

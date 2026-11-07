@@ -24,6 +24,7 @@ struct PanelActions {
     var addAccount: () -> Void = {}
     var requestRemove: (String) -> Void = { _ in }
     var setLaunchAtLogin: (Bool) -> Void = { _ in }
+    var installCommandLine: () -> Void = {}
     var about: () -> Void = {}
     var quit: () -> Void = {}
 }
@@ -31,6 +32,7 @@ struct PanelActions {
 struct PanelView: View {
     let state: PanelState
     var launchAtLogin = false
+    var commandLineInstalled = false
     var actions = PanelActions()
     /// Image snapshots cannot draw AppKit-backed menus; they show the menu's own label instead.
     var forSnapshot = false
@@ -98,6 +100,9 @@ struct PanelView: View {
                     ForEach(state.rows) { row in Button(row.name) { actions.requestRemove(row.id) } }
                 }
                 .disabled(state.busy || state.rows.isEmpty)
+                Button(commandLineInstalled ? "Command Line Tool Installed" : "Install Command Line Tool",
+                       action: actions.installCommandLine)
+                    .disabled(commandLineInstalled)
                 Divider()
                 Button("About Claude Desktop Baton", action: actions.about)
                 Button("Quit", action: actions.quit).keyboardShortcut("q")
