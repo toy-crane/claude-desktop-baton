@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 
 NAME="Claude Desktop Baton"
 BUNDLE_ID="com.toycrane.claude-desktop-baton"
-VERSION="0.1.0"
+VERSION="0.2.0"
 APP="build/$NAME.app"
 
 swift build -c release --product ClaudeDesktopBaton
