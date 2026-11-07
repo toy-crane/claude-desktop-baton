@@ -17,8 +17,9 @@ Claude Desktop stores its data.
 
 ## User-visible outcomes
 
-- When a newer version has been published, the baton icon in the menu bar gets
-  a small dot and the panel shows an **update notice** row, "Update available ·
+- When a newer version has been published, the menu bar item gets a small dot
+  (at the top left of the baton, or right after the usage percent when the
+  menu bar shows the signed-in account's usage) and the panel shows an **update notice** row, "Update available ·
   0.3.0", with an **Install…** button. Nothing pops up on its own.
 - Install… opens the update window: new and current version, the release notes,
   and Skip This Version, Remind Me Later, and Install Update. Install Update
@@ -92,7 +93,7 @@ Out:
 ## Acceptance criteria
 
 - With 0.3.0 installed and a 0.3.1 release published, within a day (or after
-  relaunching the app) the baton icon shows a dot and the panel shows "Update
+  relaunching the app) the menu bar item shows a dot and the panel shows "Update
   available · 0.3.1" with Install…; no window or notification appeared on its
   own.
 - Clicking Install… opens the update window naming 0.3.1 and 0.3.0 with the

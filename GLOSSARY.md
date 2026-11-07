@@ -22,5 +22,5 @@ _Avoid_: CLI token, credentials
 The account the CLI is signed in to right now; it can differ from the account Claude Desktop is signed in to.
 
 **Update notice**:
-The dot on the menu bar icon and the "Update available" row in the panel that say a newer version of this app is ready to install; separate from Sparkle's update window, which opens only from it or from Check for Updates.
+The dot on the menu bar item (the baton or the usage meter) and the "Update available" row in the panel that say a newer version of this app is ready to install; separate from Sparkle's update window, which opens only from it or from Check for Updates.
 _Avoid_: Update alert, update popup

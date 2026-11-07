@@ -43,7 +43,7 @@ account you switch to, like passing a baton.
   and ask for a switch, with `--json` output. Install it from the panel's `⋯`
   menu; `claude-desktop-baton help` explains the rest.
 - **Updates itself.** About once a day it checks for a new version. When one is
-  out, the baton gets a small dot and the panel shows **Update available** with
+  out, the menu bar item gets a small dot and the panel shows **Update available** with
   an **Install…** button; nothing pops up on its own. An update never restarts
   the app in the middle of a switch.
 
