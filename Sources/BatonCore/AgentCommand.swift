@@ -184,6 +184,16 @@ public enum AgentCommand {
 
     public static let commandName = "claude-desktop-baton"
 
+    /// Whether a process started with `arguments` is the command line rather than the menu bar app.
+    /// Through the PATH link it always is; the app's own executable is the app only when started with
+    /// no arguments or with the ones macOS and Xcode add at launch (`-psn_…`, `-NS…`, `-Apple…`).
+    public static func isCommandLine(_ arguments: [String]) -> Bool {
+        guard let executable = arguments.first else { return false }
+        if URL(fileURLWithPath: executable).lastPathComponent == commandName { return true }
+        guard let first = arguments.dropFirst().first else { return false }
+        return !["-psn", "-NS", "-Apple"].contains { first.hasPrefix($0) }
+    }
+
     struct Options { var json = false, force = false, best = false, noWait = false, refresh = false }
 
     // MARK: commands

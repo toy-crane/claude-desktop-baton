@@ -60,6 +60,20 @@ struct ControlChannelTests {
         #expect(second == .accepted)
     }
 
+    // Bug: a second menu bar app took over the socket, leaving the first one unreachable.
+    @Test func aSecondServerDoesNotTakeOverASocketInUse() throws {
+        let socket = socketPath()
+        let first = try ControlServer(socket: socket) { _, reply in reply.send(.refused(.switching)) }
+        defer { first.stop() }
+
+        let second = try? ControlServer(socket: socket) { _, reply in reply.send(.refused(.unknownAccount)) }
+        second?.stop()
+        let response = try ControlClient.send(ControlRequest(accountId: "b"), socket: socket, wait: true, timeout: 5)
+
+        #expect(second == nil)
+        #expect(response == .refused(.switching))
+    }
+
     @Test func nobodyListeningIsUnreachable() {
         let socket = socketPath()
 

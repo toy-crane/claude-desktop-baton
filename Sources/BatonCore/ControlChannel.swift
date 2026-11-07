@@ -14,6 +14,8 @@ public final class ControlServer: @unchecked Sendable {
         path = socket.path
         try FileManager.default.createDirectory(at: socket.deletingLastPathComponent(), withIntermediateDirectories: true,
                                                 attributes: [.posixPermissions: 0o700])
+        // Another running copy of the app keeps its socket; a file left by one that quit is replaced.
+        if ControlClient.isListening(socket) { throw BatonError("Another Claude Desktop Baton is already listening.") }
         unlink(path)
         let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw BatonError("The control socket could not be created.") }

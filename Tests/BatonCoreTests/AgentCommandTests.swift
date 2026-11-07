@@ -318,6 +318,20 @@ struct AgentCommandTests {
         #expect(out.text.contains("Unknown command"))
     }
 
+    // Bug: the app's executable run with an unknown word started a second menu bar app.
+    @Test func anyWordAfterTheExecutableIsACommandAndOnlyLaunchArgumentsStartTheApp() {
+        let app = "/Applications/Claude Desktop Baton.app/Contents/MacOS/ClaudeDesktopBaton"
+        #expect(AgentCommand.isCommandLine([app, "sync"]))
+        #expect(AgentCommand.isCommandLine([app, "accounts", "--json"]))
+        #expect(AgentCommand.isCommandLine([app, "--status"]))
+        #expect(AgentCommand.isCommandLine([app, "--json", "accounts"]))
+        #expect(AgentCommand.isCommandLine(["/Users/me/.local/bin/claude-desktop-baton"]))
+        #expect(AgentCommand.isCommandLine(["claude-desktop-baton", "help"]))
+        #expect(!AgentCommand.isCommandLine([app]))
+        #expect(!AgentCommand.isCommandLine([app, "-psn_0_123456"]))
+        #expect(!AgentCommand.isCommandLine([app, "-NSDocumentRevisionsDebugMode", "YES"]))
+    }
+
     @Test func helpExplainsTheRefusalsAndExitCodes() async throws {
         let f = try threeAccounts()
 
