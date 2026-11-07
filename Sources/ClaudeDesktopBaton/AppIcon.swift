@@ -54,10 +54,16 @@ enum AppIcon {
 extension AppIcon {
     /// The menu bar icon: the same baton as the app icon, as a template image so macOS tints it
     /// for light and dark menu bars and for the highlighted state.
-    static let menuBar: NSImage = {
+    static let menuBar = menuBarImage(dot: false)
+
+    /// The menu bar icon with the update notice's dot, set off from the baton by a gap.
+    static let menuBarWithDot = menuBarImage(dot: true)
+
+    private static func menuBarImage(dot: Bool) -> NSImage {
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size, flipped: false) { rect in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
+            context.saveGState()
             context.translateBy(x: rect.midX, y: rect.midY)
             context.rotate(by: .pi / 4)
             let length: CGFloat = 16.5, thickness: CGFloat = 5
@@ -70,10 +76,20 @@ extension AppIcon {
             for x in [-2.6, 1.4] as [CGFloat] {
                 context.fill(CGRect(x: x, y: -thickness, width: 1.2, height: thickness * 2))
             }
+            context.restoreGState()
+            if dot {
+                // Top-left, the corner the diagonal baton leaves empty.
+                let center = CGPoint(x: rect.minX + 3.4, y: rect.maxY - 3.4)
+                context.setBlendMode(.clear)
+                context.fillEllipse(in: CGRect(x: center.x - 4.2, y: center.y - 4.2, width: 8.4, height: 8.4))
+                context.setBlendMode(.normal)
+                context.setFillColor(NSColor.black.cgColor)
+                context.fillEllipse(in: CGRect(x: center.x - 2.8, y: center.y - 2.8, width: 5.6, height: 5.6))
+            }
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "Claude Desktop Baton"
+        image.accessibilityDescription = dot ? "Claude Desktop Baton: update available" : "Claude Desktop Baton"
         return image
-    }()
+    }
 }

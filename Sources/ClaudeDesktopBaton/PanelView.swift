@@ -25,6 +25,7 @@ struct PanelActions {
     var requestRemove: (String) -> Void = { _ in }
     var setLaunchAtLogin: (Bool) -> Void = { _ in }
     var installCommandLine: () -> Void = {}
+    var checkForUpdates: () -> Void = {}
     var about: () -> Void = {}
     var quit: () -> Void = {}
 }
@@ -33,6 +34,8 @@ struct PanelView: View {
     let state: PanelState
     var launchAtLogin = false
     var commandLineInstalled = false
+    /// The newer version the update notice offers; nil hides its row.
+    var update: String?
     var actions = PanelActions()
     /// Image snapshots cannot draw AppKit-backed menus; they show the menu's own label instead.
     var forSnapshot = false
@@ -62,12 +65,32 @@ struct PanelView: View {
             }
             .padding(.horizontal, 6)
             .padding(.bottom, 6)
+            if let update {
+                Rectangle().fill(p.border).frame(height: 1)
+                updateRow(update, p)
+            }
             Rectangle().fill(p.border).frame(height: 1)
             footer(p)
         }
         .frame(width: 300)
         .background(p.background)
         .foregroundStyle(p.ink)
+    }
+
+    /// The update notice's row: a newer version of this app is ready to install.
+    private func updateRow(_ version: String, _ p: Palette) -> some View {
+        HStack(spacing: 8) {
+            Circle().fill(p.ink).frame(width: 6, height: 6)
+            (Text("Update available").font(.system(size: 12.5))
+                + Text(" · \(version)").font(.system(size: 12.5)).foregroundStyle(p.muted))
+                .lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 6)
+            Button("Install…", action: actions.checkForUpdates)
+                .font(.system(size: 12, weight: .medium))
+                .buttonStyle(QuietButtonStyle(palette: p, prominent: true))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     private func footer(_ p: Palette) -> some View {
@@ -105,6 +128,7 @@ struct PanelView: View {
                        action: actions.installCommandLine)
                     .disabled(commandLineInstalled)
                 Divider()
+                Button("Check for Updates…", action: actions.checkForUpdates)
                 Button("About Claude Desktop Baton", action: actions.about)
                 Button("Quit", action: actions.quit).keyboardShortcut("q")
             } label: {

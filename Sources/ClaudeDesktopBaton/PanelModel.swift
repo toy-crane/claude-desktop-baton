@@ -13,6 +13,7 @@ final class PanelModel {
     let usageCache: UsageCache
     let cli: CLIAccounts
     let controlSocket: URL
+    let updater = AppUpdater()
 
     private(set) var accounts: [SavedAccount] = []
     private(set) var current: Identity?
@@ -30,11 +31,14 @@ final class PanelModel {
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var fetching: Set<String> = []
     @ObservationIgnored private var control: ControlServer?
+    /// Alerts open right now; an update must not relaunch the app under one (a switch alert may lead to Put Back).
+    @ObservationIgnored private var alertsOpen = 0
 
     var state: PanelState {
         PanelState.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now, cli: cliState, cliSaved: cliSaved)
     }
-    var isBusy: Bool { state.busy }
+    /// A switch, an account add, or an update about to quit the app: no new switch may start.
+    var isBusy: Bool { state.busy || updater.isInstalling }
     var menuBar: MenuBarLabel {
         MenuBarLabel.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now)
     }
@@ -56,10 +60,20 @@ final class PanelModel {
         control = try? ControlServer(socket: controlSocket) { [weak self] request, reply in
             Task { @MainActor in self?.handle(request, reply) }
         }
+        updater.mayRelaunch = { [weak self] in
+            guard let self else { return true }
+            return UpdateGate.mayRelaunch(phase: phase, alertOpen: alertsOpen > 0)
+        }
+        updater.start()
         tick()
         refreshCLI()
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+            Task { @MainActor in
+                // A held update relaunch goes ahead only from this timer, never from tick() itself: a switch
+                // calls tick() as it ends, before its result alert (and Put Back) is shown.
+                self?.updater.resumeIfAllowed()
+                self?.tick()
+            }
         }
     }
 
@@ -81,6 +95,7 @@ final class PanelModel {
 
     func panelOpened() {
         now = Date()
+        updater.panelOpened()
         launchAtLogin = SMAppService.mainApp.status == .enabled
         commandLineInstalled = CommandLineTool.state == .installed
         refreshCLI()
@@ -251,6 +266,8 @@ final class PanelModel {
         alert.informativeText = content.message
         content.buttons.forEach { alert.addButton(withTitle: $0) }
         NSApp.activate()
+        alertsOpen += 1
+        defer { alertsOpen -= 1 }
         return alert.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
     }
 
@@ -273,6 +290,12 @@ final class PanelModel {
     func setLaunchAtLogin(_ on: Bool) {
         if on { try? SMAppService.mainApp.register() } else { try? SMAppService.mainApp.unregister() }
         launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
+    /// The panel's Install… and the "⋯" menu's Check for Updates… both open the update window.
+    func checkForUpdates() {
+        closePanel()
+        updater.checkForUpdates()
     }
 
     func showAbout() {

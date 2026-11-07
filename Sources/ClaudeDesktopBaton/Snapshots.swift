@@ -21,6 +21,8 @@ func renderSnapshots(to folder: URL) {
     let current = Identity(account: a, org: org)
     var cases: [(String, PanelState)] = []
     cases.append(("default", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now)))
+    let updateCase = "update"
+    cases.append((updateCase, PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now)))
     cases.append(("switching", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .switching(accountId: b), now: now)))
     cases.append(("cli", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now,
                                          cli: .account(Identity(account: b, org: org)), cliSaved: [a, b])))
@@ -73,6 +75,11 @@ func renderSnapshots(to folder: URL) {
             menuBar(MenuBarMeter.image(shown), "menubar-\(name)")
         }
     }
+    // The update notice's dot, on the baton and on the usage meter.
+    menuBar(AppIcon.menuBarWithDot, "menubar-update")
+    if case .usage(let shown) = MenuBarLabel.make(accounts: accounts, current: current, usage: [a: meterCases[0].1!], phase: .idle, now: now) {
+        menuBar(MenuBarMeter.image(shown, updateDot: true), "menubar-usage-update")
+    }
 
     // The alerts that replace in-panel switching messages, drawn without showing them.
     let alerts: [(String, AlertContent)] = [
@@ -96,7 +103,8 @@ func renderSnapshots(to folder: URL) {
     }
     for (name, state) in cases {
         for scheme in [ColorScheme.light, .dark] {
-            let view = PanelView(state: state, forSnapshot: true).environment(\.colorScheme, scheme)
+            let view = PanelView(state: state, update: name == updateCase ? "0.3.1" : nil, forSnapshot: true)
+                .environment(\.colorScheme, scheme)
             let renderer = ImageRenderer(content: view)
             renderer.scale = 2
             guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,

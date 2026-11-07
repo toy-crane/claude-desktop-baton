@@ -42,6 +42,10 @@ account you switch to, like passing a baton.
   usage | switch <account> | switch --best` lets agents and scripts see usage
   and ask for a switch, with `--json` output. Install it from the panel's `⋯`
   menu; `claude-desktop-baton help` explains the rest.
+- **Updates itself.** About once a day it checks for a new version. When one is
+  out, the menu bar item gets a small dot and the panel shows **Update available** with
+  an **Install…** button; nothing pops up on its own. An update never restarts
+  the app in the middle of a switch.
 
 <p align="center">
   <picture>
@@ -88,6 +92,15 @@ On first launch:
 Do not use Claude's own **Log Out** for a saved account: it most likely ends
 that session on Anthropic's side, and the saved copy stops working.
 
+### Updating
+
+Versions after 0.2.0 update themselves: choose **Install…** in the panel,
+or **Check for Updates…** in the `⋯` menu, and it downloads, verifies, replaces
+itself, and reopens. Saved accounts, the Keychain approval, launch at login, and
+the `claude-desktop-baton` command carry over. **Version 0.2.0 and earlier
+cannot update themselves**: download the new DMG once and drag it over the old
+app in Applications.
+
 ## What it touches
 
 | What | When |
@@ -105,6 +118,7 @@ that session on Anthropic's side, and the saved copy stops working.
 | Keychain items "Claude Desktop Baton CLI sign-in" | Each account's saved CLI sign-in |
 | `~/Library/Application Support/Claude Desktop Baton/` | Saved accounts (still encrypted with Claude's key), the previous sign-in, staging, trash, usage cache, and the socket the command line talks to |
 | `~/.local/bin/claude-desktop-baton` | A link to the app, created only when you choose Install Command Line Tool |
+| `https://github.com/toy-crane/claude-desktop-baton/releases/latest/download/appcast.xml` | The update feed, read about once a day and on Check for Updates; nothing about your Mac is sent with it |
 
 Claude.app itself is never modified, decrypted values are never written to
 disk, and sign-ins are only swapped while Claude is closed. Sessions removed
@@ -130,8 +144,16 @@ by a sync go to the app's own trash, not the system's.
 ```bash
 swift test                   # unit tests
 scripts/build-app.sh install # build, sign with your Apple Development identity, install, open
-scripts/release.sh           # Developer ID signing, notarization, stapling, zip
+scripts/release.sh           # Developer ID signing, notarization, stapling, zip, DMG, update feed
 ```
+
+A release needs its notes in `release-notes/<version>.md` (shown in the update
+window and used for the GitHub release) and the Sparkle update signing key in
+the login Keychain. `release.sh` prints the `gh release create` command that
+publishes the zip, the DMG, and `appcast.xml` together; installed copies read
+the feed from the latest release, so every release must carry it. Updates are
+built with [Sparkle](https://sparkle-project.org); see
+[docs/decisions/app-updates.md](docs/decisions/app-updates.md).
 
 `claude-desktop-baton status` (or `ClaudeDesktopBaton --status`) previews what
 a switch would sync without changing anything. The product contract is in

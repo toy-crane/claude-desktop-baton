@@ -7,6 +7,10 @@ let package = Package(
     products: [
         .executable(name: "ClaudeDesktopBaton", targets: ["ClaudeDesktopBaton"])
     ],
+    dependencies: [
+        // App updates (docs/decisions/app-updates.md). Pinned; scripts/build-app.sh embeds and signs the framework.
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.1")
+    ],
     targets: [
         .target(
             name: "BatonCore",
@@ -14,7 +18,9 @@ let package = Package(
         ),
         .executableTarget(
             name: "ClaudeDesktopBaton",
-            dependencies: ["BatonCore"]
+            dependencies: ["BatonCore", .product(name: "Sparkle", package: "Sparkle")],
+            // Finds Sparkle.framework in the app bundle's Contents/Frameworks, also when run through the ~/.local/bin link.
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
         .testTarget(
             name: "BatonCoreTests",
