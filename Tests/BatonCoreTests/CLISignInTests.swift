@@ -226,6 +226,29 @@ struct CLISignInTests {
         #expect(FileManager.default.fileExists(atPath: x.paths.refreshLock.path))
     }
 
+    // AC1 / after the first real switch: every other value in the CLI's item survives the rewrite exactly.
+    @Test func everyOtherValueInTheCLIItemSurvivesASwitchExactly() throws {
+        let (x, _, b) = try CLIFixture.twoAccountsWithCLI()
+        let mcp: [String: Any] = [
+            "Vercel|0473acd8": ["accessToken": "a/b+c==", "expiresAt": 1_794_100_000_123, "scope": "read write",
+                                "discoveryState": ["authorizationServerUrl": "https://vercel.com/oauth", "ok": true]],
+            "plugin:supabase:supabase|abe1": ["clientId": "é한글", "expiresAt": 0, "ratio": 1.5, "flags": [true, false], "none": NSNull()],
+        ]
+        var item = x.item
+        item["mcpOAuth"] = mcp
+        item["futureKey"] = ["nested": [1, 2, 3]]
+        x.credentials.item.set(try JSONSerialization.data(withJSONObject: item))
+        func canonical(_ value: Any) throws -> String {
+            String(decoding: try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .fragmentsAllowed]), as: UTF8.self)
+        }
+        let before = try canonical(x.item.filter { $0.key != "claudeAiOauth" })
+
+        #expect(x.cli.follow(b) == .moved)
+
+        #expect(try canonical(x.item.filter { $0.key != "claudeAiOauth" }) == before)
+        #expect(x.cliRefreshToken == "rt-B")
+    }
+
     // AC7: the CLI moves only after Claude confirms the target.
     @Test func aFailedDesktopSwitchLeavesTheCLIUnchanged() async throws {
         let (x, _, b) = try CLIFixture.twoAccountsWithCLI()
