@@ -25,7 +25,8 @@ enum LiveAgent {
                                    workingSessions: switcher.workingSessions(), legacyImportable: legacy,
                                    syncPreview: preview.summary + notes)
             },
-            requestSwitch: { request, wait in await requestSwitch(request, wait: wait, socket: paths.controlSocket) })
+            requestSwitch: { request, wait in await requestSwitch(request, wait: wait, socket: paths.controlSocket) },
+            cli: CLIAccounts(paths: .live, credentials: SecurityCLICredentials(), saved: KeychainSecrets(), store: store))
     }
 
     /// Hands the switch to the menu bar app, launching it first when nothing is listening.

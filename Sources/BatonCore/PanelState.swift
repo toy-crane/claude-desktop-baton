@@ -38,6 +38,8 @@ public struct AccountRow: Equatable, Sendable, Identifiable {
     public let failureReason: String?
     public let tooltip: String
     public let email: String?
+    /// The Claude Code CLI is signed in to this account.
+    public var isCLI = false
 }
 
 public enum SwitchDecision: Equatable, Sendable {
@@ -81,7 +83,7 @@ public enum Alerts {
 
     public static let addAccountReady = AlertContent(
         title: "Sign in to another account",
-        message: "Claude reopened signed out on this Mac. Sign in to another account in Claude; it is saved automatically.",
+        message: "Claude reopened signed out on this Mac. Sign in to another account in Claude; it is saved automatically. To have the CLI follow it too, run `claude` and `/login` as that account once.",
         buttons: ["OK"])
 
     public static func commandLineInstalled(onPath: Bool?) -> AlertContent {
@@ -101,6 +103,19 @@ public enum Alerts {
         AlertContent(title: "Couldn't install the command line tool", message: message, buttons: ["OK"])
     }
 
+    /// After a switch whose target has no saved CLI sign-in. `cli` names the CLI's account, nil when signed out.
+    public static func cliNotFollowing(to name: String, cli: String?) -> AlertContent {
+        let state = cli.map { "The CLI is still on \($0)." } ?? "The CLI is signed out."
+        return AlertContent(title: "Switched to \(name)",
+                            message: "\(state) Run `claude` and `/login` as \(name) once; after that it follows every switch.",
+                            buttons: ["OK"])
+    }
+
+    public static func cliFailed(to name: String, previous: String?, message: String) -> AlertContent {
+        AlertContent(title: "Switched to \(name)",
+                     message: "The CLI stayed on \(previous ?? "its previous account"): \(message)", buttons: ["OK"])
+    }
+
     public static func confirmRemove(_ name: String) -> AlertContent {
         AlertContent(title: "Remove \(name)?",
                      message: "Only its saved sign-in is deleted from Claude Desktop Baton. Claude and your sessions are not changed.",
@@ -117,9 +132,11 @@ public struct PanelState: Equatable, Sendable {
     public let busy: Bool
     /// "updated 1 min ago", for the "⋯" menu.
     public let updated: String?
+    /// For the "⋯" menu when no saved account carries the CLI tag: "CLI: signed out", "CLI: not on a saved account".
+    public var cliNote: String?
 
     public static func make(accounts: [SavedAccount], current: Identity?, usage: [String: UsageEntry],
-                            phase: Phase, now: Date) -> PanelState {
+                            phase: Phase, now: Date, cli: CLIState? = nil, cliSaved: Set<String> = []) -> PanelState {
         let names = displayNames(accounts)
         var target: String?
         let busy: Bool
@@ -144,6 +161,7 @@ public struct PanelState: Equatable, Sendable {
             let limited = [shown?.session, shown?.week].compactMap { $0 }.filter(\.isAtLimit)
             let resetNote = limited.compactMap(\.resetsAt).min().map { UsageText.until($0, from: now) }
             var tooltip = [account.email ?? account.accountId]
+            if cli != nil, !cliSaved.contains(account.accountId) { tooltip.append("CLI not signed in yet") }
             if let shown {
                 tooltip.append("Session resets \(when(shown.session?.resetsAt)) · Week resets \(when(shown.week?.resetsAt))")
             }
@@ -152,7 +170,8 @@ public struct PanelState: Equatable, Sendable {
                               isTarget: account.accountId == target, isDisabled: busy,
                               session: meter(shown?.session), week: meter(shown?.week),
                               resetNote: resetNote, failureReason: entry?.failure?.reason,
-                              tooltip: tooltip.joined(separator: "\n"), email: account.email)
+                              tooltip: tooltip.joined(separator: "\n"), email: account.email,
+                              isCLI: cli?.identity.map { $0.account == account.accountId && $0.org == account.orgId } ?? false)
         }
 
         let checked = usage.values.compactMap(\.checked).max()
@@ -160,6 +179,12 @@ public struct PanelState: Equatable, Sendable {
             let minutes = Int(now.timeIntervalSince(date) / 60)
             return minutes < 1 ? "updated just now" : "updated \(minutes) min ago"
         }
-        return PanelState(rows: rows, busy: busy, updated: updated)
+        let cliNote: String?
+        switch cli {
+        case nil: cliNote = nil
+        case .signedOut?: cliNote = "CLI: signed out"
+        case .account?: cliNote = rows.contains(where: \.isCLI) ? nil : "CLI: not on a saved account"
+        }
+        return PanelState(rows: rows, busy: busy, updated: updated, cliNote: cliNote)
     }
 }

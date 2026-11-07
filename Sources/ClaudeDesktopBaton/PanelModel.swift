@@ -11,6 +11,7 @@ final class PanelModel {
     let switcher: Switcher
     let client: UsageClient
     let usageCache: UsageCache
+    let cli: CLIAccounts
     let controlSocket: URL
 
     private(set) var accounts: [SavedAccount] = []
@@ -20,6 +21,8 @@ final class PanelModel {
     private(set) var step: SwitchStep?
     private(set) var launchAtLogin = false
     private(set) var commandLineInstalled = false
+    private(set) var cliState: CLIState?
+    private(set) var cliSaved: Set<String> = []
     private(set) var now = Date()
     private var addingSince: Date?
     /// Claude's log size when it reopened signed out; any account loading after it ends adding.
@@ -28,13 +31,16 @@ final class PanelModel {
     @ObservationIgnored private var fetching: Set<String> = []
     @ObservationIgnored private var control: ControlServer?
 
-    var state: PanelState { PanelState.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now) }
+    var state: PanelState {
+        PanelState.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now, cli: cliState, cliSaved: cliSaved)
+    }
     var isBusy: Bool { state.busy }
 
     init(claude: ClaudePaths = .live, paths: AppPaths = .live) {
         self.claude = claude
         store = AccountStore(paths: paths)
-        switcher = Switcher(claude: claude, paths: paths, store: store, app: LiveClaude())
+        cli = CLIAccounts(paths: .live, credentials: SecurityCLICredentials(), saved: KeychainSecrets(), store: store)
+        switcher = Switcher(claude: claude, paths: paths, store: store, app: LiveClaude(), cli: cli)
         client = UsageClient(userAgent: ClaudeKeychain.userAgent(claudeApp: LiveClaude.appURL), key: { try ClaudeKeychain.cookieKey() })
         usageCache = UsageCache(file: paths.usageCache)
         controlSocket = paths.controlSocket
@@ -48,6 +54,7 @@ final class PanelModel {
             Task { @MainActor in self?.handle(request, reply) }
         }
         tick()
+        refreshCLI()
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }
@@ -73,6 +80,7 @@ final class PanelModel {
         now = Date()
         launchAtLogin = SMAppService.mainApp.status == .enabled
         commandLineInstalled = CommandLineTool.state == .installed
+        refreshCLI()
         refreshUsage(panelOpening: true)
     }
 
@@ -99,6 +107,14 @@ final class PanelModel {
                 if case .success = result { await fillNames(id: id, org: org, signIn: signIn) }
             }
         }
+    }
+
+    /// Saves the CLI's sign-in when it belongs to a saved account, and reads who the CLI is on.
+    /// Run at launch, when the panel opens and after a switch; `~/.claude.json` is too large to read every tick.
+    private func refreshCLI() {
+        cli.saveCurrent()
+        cliState = cli.current()
+        cliSaved = cli.accountsWithSavedSignIn()
     }
 
     private func fillNames(id: String, org: String, signIn: SignIn) async {
@@ -150,6 +166,7 @@ final class PanelModel {
             phase = .idle
             usage[id]?.lastAttempt = nil
             tick()
+            refreshCLI()
             onFinish?(result)
             if let error = result.error {
                 let previous = result.previous?.account
@@ -158,8 +175,18 @@ final class PanelModel {
                    putBack != nil, let previous {
                     startSwitch(to: previous)
                 }
-            } else if let aborted = result.sync?.aborted {
-                show(Alerts.syncSkipped(to: name(id), reason: aborted))
+            } else {
+                if let aborted = result.sync?.aborted { show(Alerts.syncSkipped(to: name(id), reason: aborted)) }
+                switch result.cli {
+                case .notSaved(let state)?:
+                    let cliName = state.identity.map { identity in
+                        accounts.first { $0.identity == identity }.map { name($0.accountId) } ?? "another account"
+                    }
+                    show(Alerts.cliNotFollowing(to: name(id), cli: cliName))
+                case .failed(let message)?:
+                    show(Alerts.cliFailed(to: name(id), previous: nil, message: message))
+                default: break
+                }
             }
         }
     }
@@ -202,6 +229,8 @@ final class PanelModel {
         closePanel()
         guard show(Alerts.confirmRemove(name(id))) == 0 else { return }
         try? store.remove(id)
+        cli.forget(id)
+        cliSaved.remove(id)
         usage[id] = nil
         tick()
     }

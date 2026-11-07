@@ -95,6 +95,7 @@ struct PanelView: View {
     private func moreMenu(_ p: Palette) -> some View {
             Menu {
                 if let updated = state.updated { Text(updated) }
+                if let cliNote = state.cliNote { Text(cliNote) }
                 Toggle("Launch at login", isOn: Binding(get: { launchAtLogin }, set: actions.setLaunchAtLogin))
                 Menu("Remove account") {
                     ForEach(state.rows) { row in Button(row.name) { actions.requestRemove(row.id) } }
@@ -162,6 +163,12 @@ struct AccountBlock: View {
                 if row.isTarget { lead(p) }
                 Text(row.name).font(.system(size: prominent ? 15 : 13, weight: prominent ? .semibold : .medium))
                     .lineLimit(1).truncationMode(.tail)
+                if row.isCLI {
+                    Text("CLI").font(.system(size: 9.5, weight: .semibold, design: .monospaced)).foregroundStyle(p.muted)
+                        .padding(.horizontal, 4).padding(.vertical, 1)
+                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(p.muted.opacity(0.6), lineWidth: 0.75))
+                        .help("The Claude Code CLI is signed in to this account.")
+                }
                 if let reason = row.failureReason {
                     Image(systemName: "exclamationmark.circle").font(.system(size: 11)).foregroundStyle(p.muted).help(reason)
                 }

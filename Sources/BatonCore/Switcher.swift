@@ -27,6 +27,8 @@ public struct SwitchResult: Sendable {
     public var previous: Identity?
     /// Whether Claude's sign-in was replaced; without that there is nothing to put back.
     public var signInChanged = false
+    /// What happened to the Claude Code CLI; nil when the switch did not reach it.
+    public var cli: CLIFollow?
 }
 
 public final class Switcher: @unchecked Sendable {
@@ -35,13 +37,17 @@ public final class Switcher: @unchecked Sendable {
     public let store: AccountStore
     let app: ClaudeApp
     let timing: SwitchTiming
+    /// Moves the Claude Code CLI after Claude confirms the target; nil leaves the CLI alone.
+    public let cli: CLIAccounts?
 
-    public init(claude: ClaudePaths, paths: AppPaths, store: AccountStore, app: ClaudeApp, timing: SwitchTiming = SwitchTiming()) {
+    public init(claude: ClaudePaths, paths: AppPaths, store: AccountStore, app: ClaudeApp, timing: SwitchTiming = SwitchTiming(),
+                cli: CLIAccounts? = nil) {
         self.claude = claude
         self.paths = paths
         self.store = store
         self.app = app
         self.timing = timing
+        self.cli = cli
     }
 
     /// Quit Claude, re-save the outgoing sign-in, sync sessions, put the target's sign-in
@@ -49,7 +55,10 @@ public final class Switcher: @unchecked Sendable {
     public func switchTo(_ target: SavedAccount, progress: @Sendable (SwitchStep) -> Void = { _ in }) async -> SwitchResult {
         let outgoing = ClaudeLog.current(claude.log)
         if outgoing?.account == target.accountId && app.isRunning { return SwitchResult(previous: outgoing) }
-        return await restart(into: target.signIn, expecting: target.accountId, outgoing: outgoing, progress: progress)
+        var result = await restart(into: target.signIn, expecting: target.accountId, outgoing: outgoing, progress: progress)
+        // The CLI follows only once Claude has confirmed the target, so a failed switch never splits them.
+        if result.error == nil, let cli { result.cli = cli.follow(target) }
+        return result
     }
 
     /// Like a switch, but Claude reopens signed out on this Mac only, so another account can sign in.

@@ -129,14 +129,17 @@ public struct AgentContext: Sendable {
     public var environment: [String: String]
     public var now: @Sendable () -> Date
     public var status: @Sendable () -> StatusFacts
+    /// The CLI's account and the saved CLI sign-ins; nil leaves them out.
+    public var cli: CLIAccounts?
     /// Hands a switch to the menu bar app, launching it when needed. With `wait`, returns the final response.
     public var requestSwitch: @Sendable (ControlRequest, _ wait: Bool) async -> Result<ControlResponse, ControlError>
 
     public init(claude: ClaudePaths, store: AccountStore, usage: UsageReader, environment: [String: String],
                 now: @escaping @Sendable () -> Date = { Date() }, status: @escaping @Sendable () -> StatusFacts,
-                requestSwitch: @escaping @Sendable (ControlRequest, Bool) async -> Result<ControlResponse, ControlError>) {
+                requestSwitch: @escaping @Sendable (ControlRequest, Bool) async -> Result<ControlResponse, ControlError>,
+                cli: CLIAccounts? = nil) {
         self.claude = claude; self.store = store; self.usage = usage; self.environment = environment
-        self.now = now; self.status = status; self.requestSwitch = requestSwitch
+        self.now = now; self.status = status; self.requestSwitch = requestSwitch; self.cli = cli
     }
 }
 
@@ -202,17 +205,27 @@ public enum AgentCommand {
         let accounts = context.store.all()
         let names = displayNames(accounts)
         let current = ClaudeLog.current(context.claude.log)?.account
+        let cli = context.cli?.current().identity
+        let cliSaved = context.cli?.accountsWithSavedSignIn() ?? []
         if options.json {
             return json(["accounts": accounts.map { a -> [String: Any] in
-                ["name": names[a.accountId] ?? a.accountId, "email": a.email ?? NSNull(), "accountId": a.accountId,
-                 "orgId": a.orgId, "signedIn": a.accountId == current]
+                var row: [String: Any] = ["name": names[a.accountId] ?? a.accountId, "email": a.email ?? NSNull(),
+                                          "accountId": a.accountId, "orgId": a.orgId, "signedIn": a.accountId == current]
+                if context.cli != nil {
+                    row["cli"] = cli == a.identity
+                    row["cliSignInSaved"] = cliSaved.contains(a.accountId)
+                }
+                return row
             }], code: Exit.success)
         }
         guard !accounts.isEmpty else { return AgentOutput(text: "No saved accounts.", code: Exit.success) }
         let lines = accounts.map { a in
-            "\(a.accountId == current ? "●" : " ") \(names[a.accountId] ?? a.accountId)  \(a.email ?? "-")  \(a.accountId)"
+            let marks = context.cli == nil ? "" : (cli == a.identity ? "  [CLI]" : "") + (cliSaved.contains(a.accountId) ? "" : "  (no CLI sign-in)")
+            return "\(a.accountId == current ? "●" : " ") \(names[a.accountId] ?? a.accountId)  \(a.email ?? "-")  \(a.accountId)\(marks)"
         }
-        return AgentOutput(text: (lines + ["", "● signed in to Claude Desktop"]).joined(separator: "\n"), code: Exit.success)
+        let legend = context.cli == nil ? "● signed in to Claude Desktop"
+            : "● signed in to Claude Desktop  [CLI] signed in to the Claude Code CLI; a switch moves the CLI only to accounts with a CLI sign-in"
+        return AgentOutput(text: (lines + ["", legend]).joined(separator: "\n"), code: Exit.success)
     }
 
     static func status(_ context: AgentContext, _ options: Options) -> AgentOutput {
@@ -221,8 +234,25 @@ public enum AgentCommand {
         let names = displayNames(accounts)
         let current = ClaudeLog.current(context.claude.log)
         let signedIn = current.map { names[$0.account] ?? "unsaved account \($0.account.prefix(8))" }
+        let cliState = context.cli?.current()
+        let cliSaved = context.cli?.accountsWithSavedSignIn() ?? []
+        let cliText: String? = cliState.map {
+            switch $0 {
+            case .signedOut: return "signed out"
+            case .account(let id):
+                if let account = accounts.first(where: { $0.identity == id }) { return names[account.accountId] ?? account.accountId }
+                return "unsaved account \(id.account.prefix(8))"
+            }
+        }
+        var cliJSON: Any = NSNull()
+        if let cliState {
+            var object: [String: Any] = ["signedIn": cliState != .signedOut, "accountsWithSignIn": Array(cliSaved).sorted()]
+            if let id = cliState.identity { object["accountId"] = id.account; object["name"] = cliText ?? NSNull() }
+            cliJSON = object
+        }
         if options.json {
             return json([
+                "cli": cliJSON,
                 "claudeRunning": facts.claudeRunning,
                 "menuBarAppRunning": facts.menuBarAppRunning,
                 "signedIn": current.map { ["name": signedIn ?? "", "accountId": $0.account, "saved": names[$0.account] != nil] as [String: Any] } ?? NSNull(),
@@ -234,9 +264,13 @@ public enum AgentCommand {
         }
         var lines = ["Claude running: \(facts.claudeRunning)",
                      "Menu bar app running: \(facts.menuBarAppRunning)",
-                     "Signed in: \(signedIn ?? "nobody")",
-                     "Saved accounts (\(accounts.count)):"]
-        lines += accounts.map { "  \($0.accountId == current?.account ? "●" : " ") \(names[$0.accountId] ?? $0.accountId)" }
+                     "Signed in: \(signedIn ?? "nobody")"]
+        if let cliText { lines.append("CLI: \(cliText)") }
+        lines.append("Saved accounts (\(accounts.count)):")
+        lines += accounts.map {
+            let cliMark = context.cli == nil ? "" : (cliSaved.contains($0.accountId) ? "" : "  (a switch here leaves the CLI alone: no CLI sign-in)")
+            return "  \($0.accountId == current?.account ? "●" : " ") \(names[$0.accountId] ?? $0.accountId)\(cliMark)"
+        }
         lines += ["Legacy accounts available to import: \(facts.legacyImportable)",
                   "Sessions working in the last 2 minutes: \(facts.workingSessions)",
                   "A switch now would sync: \(facts.syncPreview)"]
