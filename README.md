@@ -34,6 +34,14 @@ account you switch to, like passing a baton.
   If a switch fails, you can put the previous account back in one click.
 - **Signed-in account first.** The panel shows the signed-in account on top and
   the accounts you can switch to below.
+- **The terminal follows too.** A switch also moves the Claude Code CLI
+  (`claude` in a terminal) to the same account, including sessions already
+  running. Sign in once per account with `/login` in a terminal; the app saves
+  it. The account the CLI is on carries a `CLI` tag in the panel.
+- **A command line for agents.** `claude-desktop-baton accounts | status |
+  usage | switch <account> | switch --best` lets agents and scripts see usage
+  and ask for a switch, with `--json` output. Install it from the panel's `⋯`
+  menu; `claude-desktop-baton help` explains the rest.
 
 <p align="center">
   <picture>
@@ -72,6 +80,8 @@ On first launch:
    you sign in, and it is saved.
 3. When macOS asks whether Claude Desktop Baton may use "Claude Safe Storage",
    choose **Always Allow**. This is how it reads each account's usage.
+4. To have the terminal follow switches, run `claude` and `/login` once as each
+   account, opening the panel after each sign-in so it is saved.
 
 Do not use Claude's own **Log Out** for a saved account: it most likely ends
 that session on Anthropic's side, and the saved copy stops working.
@@ -87,7 +97,12 @@ that session on Anthropic's side, and the saved copy stops working.
 | `~/.claude/projects/` | File times read to tell which sessions are working |
 | Keychain item "Claude Safe Storage" | Read to decrypt session cookies in memory for usage requests |
 | `https://claude.ai/api/organizations/<org>/usage`, `/api/account` | Usage and account names |
-| `~/Library/Application Support/Claude Desktop Baton/` | Saved accounts (still encrypted with Claude's key), the previous sign-in, staging and trash |
+| Keychain item "Claude Code-credentials" (the CLI's login) | Its `claudeAiOauth` entry read to save each account's CLI sign-in, and replaced during a switch under Claude Code's own locks; its MCP tokens are left as they are |
+| `~/.claude.json`: `oauthAccount` | Read to tell which account the CLI is on; replaced during a switch |
+| `~/.claude/.oauth_refresh.lock`, `~/.claude.lock`, `~/.claude.json.lock` | Taken briefly during a switch, as Claude Code does |
+| Keychain items "Claude Desktop Baton CLI sign-in" | Each account's saved CLI sign-in |
+| `~/Library/Application Support/Claude Desktop Baton/` | Saved accounts (still encrypted with Claude's key), the previous sign-in, staging, trash, usage cache, and the socket the command line talks to |
+| `~/.local/bin/claude-desktop-baton` | A link to the app, created only when you choose Install Command Line Tool |
 
 Claude.app itself is never modified, decrypted values are never written to
 disk, and sign-ins are only swapped while Claude is closed. Sessions removed
@@ -103,6 +118,10 @@ by a sync go to the app's own trash, not the system's.
   it, but its remote connection may need to be re-established.
 - A newly added account lists the other accounts' sessions from its next
   switch-in on.
+- The CLI moves only to accounts whose CLI sign-in is saved; otherwise it stays
+  where it is and an alert says so. Config folders chosen with
+  `CLAUDE_CONFIG_DIR` are not touched.
+- The claude.ai website in your browser is not switched.
 
 ## Build from source
 
@@ -112,8 +131,8 @@ scripts/build-app.sh install # build, sign with your Apple Development identity,
 scripts/release.sh           # Developer ID signing, notarization, stapling, zip
 ```
 
-`ClaudeDesktopBaton --status` previews what a switch would sync without
-changing anything. The product contract is in
+`claude-desktop-baton status` (or `ClaudeDesktopBaton --status`) previews what
+a switch would sync without changing anything. The product contract is in
 [docs/specs/claude-desktop-baton/spec.md](docs/specs/claude-desktop-baton/spec.md),
 and the sync rules in [docs/decisions/session-sync.md](docs/decisions/session-sync.md).
 
