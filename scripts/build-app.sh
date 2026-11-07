@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 
 NAME="Claude Desktop Baton"
 BUNDLE_ID="com.toycrane.claude-desktop-baton"
-VERSION="0.2.0"
+VERSION="0.3.0"
 APP="build/$NAME.app"
 # Sparkle update feed and the public half of the update signing key (docs/decisions/app-updates.md).
 FEED_URL="${FEED_URL:-https://github.com/toy-crane/claude-desktop-baton/releases/latest/download/appcast.xml}"
