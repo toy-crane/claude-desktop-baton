@@ -29,27 +29,49 @@ func renderSnapshots(to folder: URL) {
 
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
-    // The menu bar icon on a light and a dark bar, at 2x.
-    for (name, bar, ink) in [("menubar-light", NSColor(white: 0.93, alpha: 1), NSColor.black), ("menubar-dark", NSColor(white: 0.16, alpha: 1), NSColor.white)] {
-        let canvas = NSImage(size: NSSize(width: 44, height: 24), flipped: false) { rect in
-            bar.setFill(); rect.fill()
-            let icon = AppIcon.menuBar.copy() as! NSImage
-            icon.isTemplate = false
-            let tinted = NSImage(size: icon.size, flipped: false) { r in
-                icon.draw(in: r); ink.set(); r.fill(using: .sourceAtop); return true
+    // The menu bar item on a light and a dark bar, at 4x: the baton, and the usage meter in its states.
+    func menuBar(_ image: NSImage, _ name: String) {
+        for (theme, bar, ink) in [("light", NSColor(white: 0.93, alpha: 1), NSColor.black), ("dark", NSColor(white: 0.16, alpha: 1), NSColor.white)] {
+            let width = image.size.width + 26
+            let canvas = NSImage(size: NSSize(width: width, height: 24), flipped: false) { rect in
+                bar.setFill(); rect.fill()
+                let template = image.copy() as! NSImage
+                template.isTemplate = false
+                let tinted = NSImage(size: template.size, flipped: false) { r in
+                    template.draw(in: r); ink.set(); r.fill(using: .sourceAtop); return true
+                }
+                tinted.draw(in: NSRect(x: 13, y: 3, width: image.size.width, height: image.size.height))
+                return true
             }
-            tinted.draw(in: NSRect(x: 13, y: 3, width: 18, height: 18))
-            return true
+            let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(width * 4), pixelsHigh: 96, bitsPerSample: 8, samplesPerPixel: 4,
+                                       hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+            canvas.draw(in: NSRect(x: 0, y: 0, width: width * 4, height: 96))
+            NSGraphicsContext.restoreGraphicsState()
+            let file = folder.appendingPathComponent("\(name)-\(theme).png")
+            try? rep.representation(using: .png, properties: [:])?.write(to: file)
+            print(file.path)
         }
-        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 176, pixelsHigh: 96, bitsPerSample: 8, samplesPerPixel: 4,
-                                   hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        canvas.draw(in: NSRect(x: 0, y: 0, width: 176, height: 96))
-        NSGraphicsContext.restoreGraphicsState()
-        let file = folder.appendingPathComponent("\(name).png")
-        try? rep.representation(using: .png, properties: [:])?.write(to: file)
-        print(file.path)
+    }
+    menuBar(AppIcon.menuBar, "menubar")
+    func bucket(_ used: Double, _ reset: TimeInterval?) -> Usage.Bucket { .init(used: used, resetsAt: reset.map(now.addingTimeInterval)) }
+    let meterCases: [(String, UsageEntry?)] = [
+        ("usage", UsageEntry(usage: Usage(session: bucket(42, 3600), week: bucket(18, 86_400)), checked: now)),
+        ("usage-low", UsageEntry(usage: Usage(session: bucket(0.4, 3600), week: bucket(3, 86_400)), checked: now)),
+        ("usage-high", UsageEntry(usage: Usage(session: bucket(91, 3600), week: bucket(64, 86_400)), checked: now)),
+        ("usage-session-limit", UsageEntry(usage: Usage(session: bucket(100, 72 * 60 + 20), week: bucket(64, 86_400)), checked: now)),
+        ("usage-week-limit", UsageEntry(usage: Usage(session: bucket(30, 3600), week: bucket(100, 2 * 86_400 + 3 * 3600)), checked: now)),
+        ("usage-both-limits", UsageEntry(usage: Usage(session: bucket(100, 72 * 60), week: bucket(100, 2 * 86_400 + 3 * 3600)), checked: now)),
+        ("usage-unavailable", UsageEntry(usage: Usage(session: bucket(42, 3600), week: bucket(18, 86_400)), failure: .offline, checked: now)),
+        ("usage-none-yet", nil),
+    ]
+    for (name, entry) in meterCases {
+        var entries = usage
+        entries[a] = entry
+        if case .usage(let shown) = MenuBarLabel.make(accounts: accounts, current: current, usage: entries, phase: .idle, now: now) {
+            menuBar(MenuBarMeter.image(shown), "menubar-\(name)")
+        }
     }
 
     // The alerts that replace in-panel switching messages, drawn without showing them.
