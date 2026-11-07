@@ -65,5 +65,12 @@ wrong-account mistake the user can see and fix with one `/login`.
 - The CLI's `oauthAccount.accountUuid` uses the same account ids as Claude
   Desktop: on 2026-11-07 the CLI was signed in to a saved account
   (`361f7049…`) while Desktop was on another (`3cb0fc11…`), same organization.
+- The CLI's Keychain item is one JSON object holding the login under
+  `claudeAiOauth` and every MCP server's tokens under `mcpOAuth` (32 KB on
+  this Mac on 2026-11-07), so only `claudeAiOauth` is saved per account and
+  replaced; replacing the whole item would swap the user's MCP logins too.
+  Claude Code writes it with `security add-generic-password -U … -X <hex>`,
+  through `security -i` stdin when the line fits in 4096 bytes and through
+  arguments otherwise.
 - This Mac also holds a `Claude Code-credentials-4058bcae` item from some
   `CLAUDE_CONFIG_DIR` profile; it is out of scope.
