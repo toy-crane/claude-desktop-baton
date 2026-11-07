@@ -21,6 +21,8 @@ func renderSnapshots(to folder: URL) {
     let current = Identity(account: a, org: org)
     var cases: [(String, PanelState)] = []
     cases.append(("default", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now)))
+    let updateCase = "update"
+    cases.append((updateCase, PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now)))
     cases.append(("switching", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .switching(accountId: b), now: now)))
     cases.append(("cli", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now,
                                          cli: .account(Identity(account: b, org: org)), cliSaved: [a, b])))
@@ -30,10 +32,13 @@ func renderSnapshots(to folder: URL) {
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
     // The menu bar icon on a light and a dark bar, at 2x.
-    for (name, bar, ink) in [("menubar-light", NSColor(white: 0.93, alpha: 1), NSColor.black), ("menubar-dark", NSColor(white: 0.16, alpha: 1), NSColor.white)] {
+    let bars = [("light", NSColor(white: 0.93, alpha: 1), NSColor.black), ("dark", NSColor(white: 0.16, alpha: 1), NSColor.white)]
+    for (prefix, source) in [("menubar", AppIcon.menuBar), ("menubar-update", AppIcon.menuBarWithDot)] {
+    for (scheme, bar, ink) in bars {
+        let name = "\(prefix)-\(scheme)"
         let canvas = NSImage(size: NSSize(width: 44, height: 24), flipped: false) { rect in
             bar.setFill(); rect.fill()
-            let icon = AppIcon.menuBar.copy() as! NSImage
+            let icon = source.copy() as! NSImage
             icon.isTemplate = false
             let tinted = NSImage(size: icon.size, flipped: false) { r in
                 icon.draw(in: r); ink.set(); r.fill(using: .sourceAtop); return true
@@ -50,6 +55,7 @@ func renderSnapshots(to folder: URL) {
         let file = folder.appendingPathComponent("\(name).png")
         try? rep.representation(using: .png, properties: [:])?.write(to: file)
         print(file.path)
+    }
     }
 
     // The alerts that replace in-panel switching messages, drawn without showing them.
@@ -74,7 +80,8 @@ func renderSnapshots(to folder: URL) {
     }
     for (name, state) in cases {
         for scheme in [ColorScheme.light, .dark] {
-            let view = PanelView(state: state, forSnapshot: true).environment(\.colorScheme, scheme)
+            let view = PanelView(state: state, update: name == updateCase ? "0.3.1" : nil, forSnapshot: true)
+                .environment(\.colorScheme, scheme)
             let renderer = ImageRenderer(content: view)
             renderer.scale = 2
             guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,

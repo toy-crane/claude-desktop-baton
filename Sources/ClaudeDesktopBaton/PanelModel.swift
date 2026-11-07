@@ -13,6 +13,7 @@ final class PanelModel {
     let usageCache: UsageCache
     let cli: CLIAccounts
     let controlSocket: URL
+    let updater = AppUpdater()
 
     private(set) var accounts: [SavedAccount] = []
     private(set) var current: Identity?
@@ -30,6 +31,8 @@ final class PanelModel {
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var fetching: Set<String> = []
     @ObservationIgnored private var control: ControlServer?
+    /// Alerts open right now; an update must not relaunch the app under one (a switch alert may lead to Put Back).
+    @ObservationIgnored private var alertsOpen = 0
 
     var state: PanelState {
         PanelState.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now, cli: cliState, cliSaved: cliSaved)
@@ -53,6 +56,11 @@ final class PanelModel {
         control = try? ControlServer(socket: controlSocket) { [weak self] request, reply in
             Task { @MainActor in self?.handle(request, reply) }
         }
+        updater.mayRelaunch = { [weak self] in
+            guard let self else { return true }
+            return UpdateGate.mayRelaunch(phase: phase, alertOpen: alertsOpen > 0)
+        }
+        updater.start()
         tick()
         refreshCLI()
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
@@ -64,6 +72,9 @@ final class PanelModel {
 
     func tick() {
         now = Date()
+        // A held update relaunch goes ahead here, never straight from an alert's return: the code after
+        // "Put Back" starts the next switch before this timer fires again.
+        updater.resumeIfAllowed()
         guard !isBusy || phase == .adding else { return }
         current = ClaudeLog.current(claude.log)
         switcher.saveCurrentIfNew()
@@ -78,6 +89,7 @@ final class PanelModel {
 
     func panelOpened() {
         now = Date()
+        updater.panelOpened()
         launchAtLogin = SMAppService.mainApp.status == .enabled
         commandLineInstalled = CommandLineTool.state == .installed
         refreshCLI()
@@ -248,6 +260,8 @@ final class PanelModel {
         alert.informativeText = content.message
         content.buttons.forEach { alert.addButton(withTitle: $0) }
         NSApp.activate()
+        alertsOpen += 1
+        defer { alertsOpen -= 1 }
         return alert.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
     }
 
@@ -270,6 +284,12 @@ final class PanelModel {
     func setLaunchAtLogin(_ on: Bool) {
         if on { try? SMAppService.mainApp.register() } else { try? SMAppService.mainApp.unregister() }
         launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
+    /// The panel's Install… and the "⋯" menu's Check for Updates… both open the update window.
+    func checkForUpdates() {
+        closePanel()
+        updater.checkForUpdates()
     }
 
     func showAbout() {
