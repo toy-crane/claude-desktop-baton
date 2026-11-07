@@ -10,15 +10,23 @@ private let D = "dddddddd-0000-4000-8000-000000000004"
 /// Stands in for the CLI's Keychain item.
 final class FakeCLICredentials: CLICredentialStore, @unchecked Sendable {
     let item = Locked<Data?>(nil)
+    /// Runs after each write, to change the world at that moment.
+    let afterWrite = Locked<(@Sendable () -> Void)?>(nil)
     func read() throws -> Data? { item.get() }
-    func write(_ data: Data) throws { item.set(data) }
+    func write(_ data: Data) throws { item.set(data); afterWrite.get()?() }
+    func delete() throws { item.set(nil) }
 }
 
 /// Stands in for Claude Desktop Baton's own Keychain items.
 final class MemorySecrets: SecretStore, @unchecked Sendable {
     let items = Locked<[String: Data]>([:])
+    /// Makes saves fail, like a Keychain that refuses the write.
+    let refusesSaves = Locked(false)
     func load(_ key: String) -> Data? { items.get()[key] }
-    func save(_ key: String, _ data: Data) throws { var all = items.get(); all[key] = data; items.set(all) }
+    func save(_ key: String, _ data: Data) throws {
+        if refusesSaves.get() { throw BatonError("Keychain refused") }
+        var all = items.get(); all[key] = data; items.set(all)
+    }
     func delete(_ key: String) { var all = items.get(); all[key] = nil; items.set(all) }
     func keys() -> Set<String> { Set(items.get().keys) }
 }
@@ -247,6 +255,35 @@ struct CLISignInTests {
 
         #expect(try canonical(x.item.filter { $0.key != "claudeAiOauth" }) == before)
         #expect(x.cliRefreshToken == "rt-B")
+    }
+
+    // PR review: when A's rotated token cannot be saved, A's live login is not overwritten.
+    @Test func anOutgoingSignInThatCannotBeSavedKeepsTheCLIWhereItIs() throws {
+        let (x, _, b) = try CLIFixture.twoAccountsWithCLI()
+        try x.cliSignIn(A, token: "A-rotated")
+        x.secrets.refusesSaves.set(true)
+
+        let result = x.cli.follow(b)
+
+        guard case .failed = result else { Issue.record("expected a failure, got \(result)"); return }
+        #expect(x.cliAccount == A)
+        #expect(x.cliRefreshToken == "rt-A-rotated")
+    }
+
+    // PR review: a failed config write removes a Keychain item the switch created.
+    @Test func aFailedConfigWriteRemovesAnItemTheSwitchCreated() throws {
+        let (x, _, b) = try CLIFixture.twoAccountsWithCLI()
+        x.credentials.item.set(nil)
+        let home = x.paths.globalConfig.deletingLastPathComponent()
+        // Locks are held by now; only ~/.claude.json's write fails.
+        x.credentials.afterWrite.set { try? FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: home.path) }
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: home.path) }
+
+        let result = x.cli.follow(b)
+
+        guard case .failed = result else { Issue.record("expected a failure, got \(result)"); return }
+        #expect(x.credentials.item.get() == nil)
+        #expect(x.cliAccount == A)
     }
 
     // AC7: the CLI moves only after Claude confirms the target.

@@ -7,6 +7,7 @@ public protocol CLICredentialStore: Sendable {
     /// The whole item as JSON, or nil when there is none.
     func read() throws -> Data?
     func write(_ data: Data) throws
+    func delete() throws
 }
 
 /// Claude Desktop Baton's own Keychain items for saved CLI sign-ins, one per account id.
@@ -79,7 +80,10 @@ public final class CLIAccounts: @unchecked Sendable {
 
     /// Saves the CLI's sign-in when it belongs to a saved account. Returns that account id.
     @discardableResult
-    public func saveCurrent() -> String? {
+    public func saveCurrent() -> String? { (try? capture()) ?? nil }
+
+    /// Like `saveCurrent`, but a failed save throws: a switch must not replace a login it could not keep.
+    func capture() throws -> String? {
         guard let config = readConfig(), let account = config[Self.accountKey] as? [String: Any],
               let identity = Self.identity(account),
               let saved = store.load(identity.account), saved.orgId == identity.org,
@@ -87,7 +91,7 @@ public final class CLIAccounts: @unchecked Sendable {
               let login = (try? JSONSerialization.jsonObject(with: item) as? [String: Any])?[Self.loginKey] as? [String: Any],
               let data = try? JSONSerialization.data(withJSONObject: [Self.loginKey: login, Self.accountKey: account], options: .sortedKeys)
         else { return nil }
-        if self.saved.load(saved.accountId) != data { try? self.saved.save(saved.accountId, data) }
+        if self.saved.load(saved.accountId) != data { try self.saved.save(saved.accountId, data) }
         return saved.accountId
     }
 
@@ -121,7 +125,9 @@ public final class CLIAccounts: @unchecked Sendable {
             held.append(lock)
         }
         // Saved under the locks, so a refresh that finished while this waited is the token kept.
-        saveCurrent()
+        do { try capture() } catch {
+            return .failed("The CLI's current sign-in could not be saved, so the CLI stayed where it was.")
+        }
 
         let previousItem: Data?
         do { previousItem = try credentials.read() } catch { return .failed("The CLI's Keychain item could not be read.") }
@@ -144,7 +150,8 @@ public final class CLIAccounts: @unchecked Sendable {
         do {
             try writeConfig(config)
         } catch {
-            if let previousItem { try? credentials.write(previousItem) }
+            // Put the item back as it was, removing it when the switch created it.
+            if let previousItem { try? credentials.write(previousItem) } else { try? credentials.delete() }
             return .failed("~/.claude.json could not be written.")
         }
         return .moved
@@ -237,6 +244,13 @@ public struct SecurityCLICredentials: CLICredentialStore {
             index = next
         }
         return bytes
+    }
+
+    public func delete() throws {
+        let result = try Self.run(["delete-generic-password", "-a", account, "-s", service])
+        guard result.status == 0 || result.status == 44 else {
+            throw BatonError("The CLI's Keychain item could not be removed (\(result.status)).")
+        }
     }
 
     public func write(_ data: Data) throws {
