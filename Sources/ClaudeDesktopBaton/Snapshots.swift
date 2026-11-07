@@ -22,6 +22,8 @@ func renderSnapshots(to folder: URL) {
     var cases: [(String, PanelState)] = []
     cases.append(("default", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now)))
     cases.append(("switching", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .switching(accountId: b), now: now)))
+    cases.append(("cli", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now,
+                                         cli: .account(Identity(account: b, org: org)), cliSaved: [a, b])))
     usage[b] = UsageEntry(failure: .offline, lastAttempt: now)
     cases.append(("usage-error", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now)))
 
@@ -55,6 +57,7 @@ func renderSnapshots(to folder: URL) {
         ("alert-confirm", Alerts.confirmSwitch(to: "Acme · sam", working: 2)),
         ("alert-failed", Alerts.switchFailed(to: "Acme · jordan", message: "Claude opened a different account. The saved sign-in may have expired; sign in to it in Claude and it is saved again.", putBack: "Acme · alex")),
         ("alert-sync", Alerts.syncSkipped(to: "Acme · sam", reason: "only 0 of 2 session files look familiar")),
+        ("alert-cli", Alerts.cliNotFollowing(to: "Acme · jordan", cli: "Acme · sam")),
     ]
     // Each alert in light and dark for the README. NSAlert ignores dark mode when drawn off screen,
     // so this draws the same text in the macOS alert layout with SwiftUI.

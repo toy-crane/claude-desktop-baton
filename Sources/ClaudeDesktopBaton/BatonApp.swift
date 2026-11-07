@@ -11,9 +11,11 @@ struct BatonApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            PanelView(state: model.state, launchAtLogin: model.launchAtLogin, actions: PanelActions(
+            PanelView(state: model.state, launchAtLogin: model.launchAtLogin, commandLineInstalled: model.commandLineInstalled,
+                      actions: PanelActions(
                 select: model.select, addAccount: model.addAccount, requestRemove: model.requestRemove,
-                setLaunchAtLogin: model.setLaunchAtLogin, about: model.showAbout, quit: model.quit))
+                setLaunchAtLogin: model.setLaunchAtLogin, installCommandLine: model.installCommandLine,
+                about: model.showAbout, quit: model.quit))
             .onAppear { model.panelOpened() }
         } label: {
             if model.isBusy {

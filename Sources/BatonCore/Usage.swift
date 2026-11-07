@@ -2,8 +2,8 @@ import CommonCrypto
 import Foundation
 
 /// claude.ai's usage response for one organization.
-public struct Usage: Equatable, Sendable {
-    public struct Bucket: Equatable, Sendable {
+public struct Usage: Equatable, Sendable, Codable {
+    public struct Bucket: Equatable, Sendable, Codable {
         /// Percent used, 0–100.
         public let used: Double
         public let resetsAt: Date?
