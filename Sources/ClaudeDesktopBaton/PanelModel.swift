@@ -38,6 +38,9 @@ final class PanelModel {
         PanelState.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now, cli: cliState, cliSaved: cliSaved)
     }
     var isBusy: Bool { state.busy }
+    var menuBar: MenuBarLabel {
+        MenuBarLabel.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now)
+    }
 
     init(claude: ClaudePaths = .live, paths: AppPaths = .live) {
         self.claude = claude
