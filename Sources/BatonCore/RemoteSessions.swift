@@ -1,8 +1,8 @@
 import Foundation
 
 /// A Claude Code session that a `claude remote-control` server is running on this Mac.
-/// It has no record in Claude Desktop's session folders, so a switch cannot carry it:
-/// it stays listed under the account that started its server. Only read, never changed.
+/// It has no record in Claude Desktop's session folders until Claude Desktop takes it over,
+/// so the sync cannot carry it; a switch hands it to Claude Desktop instead. Only read, never changed.
 public struct RemoteSession: Equatable, Sendable, Identifiable {
     /// The conversation's id, as `claude --resume` takes it.
     public let sessionId: String
@@ -28,10 +28,9 @@ public struct RemoteSession: Equatable, Sendable, Identifiable {
     /// "dearly · Plan the memory layout", or the start of the id when the session has no title yet.
     public var title: String { "\(project) · \(name ?? String(sessionId.prefix(8)))" }
 
-    /// Continues the conversation in a terminal, under whichever account the CLI is on.
-    public var resumeCommand: String {
-        "cd '\(folder.replacingOccurrences(of: "'", with: #"'\''"#))' && claude --resume \(sessionId)"
-    }
+    /// The link Claude Code's own `/desktop` command opens: Claude Desktop reads the conversation
+    /// and writes its own record for it. Observed in Claude Code 2.1.319.
+    public var desktopLink: URL? { URL(string: "claude://resume?session=\(sessionId)") }
 }
 
 /// Reads Claude Code's registry of running sessions (`~/.claude/sessions/<pid>.json`).
@@ -63,12 +62,23 @@ public enum RemoteSessions {
         return sessions.sorted { ($0.project, $0.title, $0.sessionId) < ($1.project, $1.title, $1.sessionId) }
     }
 
-    /// One resume command per line, for the clipboard.
-    public static func resumeCommands(_ sessions: [RemoteSession]) -> String {
-        sessions.map(\.resumeCommand).joined(separator: "\n")
+    /// The sessions Claude Desktop has no record of yet in any account folder. One it took over before
+    /// has a record the sync carries, and one deleted in Claude keeps its marker and is not brought back.
+    public static func notInClaudeDesktop(_ sessions: [RemoteSession], sessionsRoot: URL) -> [RemoteSession] {
+        var known: Set<String> = []
+        for account in (try? SessionSync.uuidDirectories(sessionsRoot)) ?? [] {
+            let accountURL = sessionsRoot.appendingPathComponent(account)
+            for org in (try? SessionSync.uuidDirectories(accountURL)) ?? [] {
+                for name in (try? FileManager.default.contentsOfDirectory(atPath: accountURL.appendingPathComponent(org).path)) ?? [] {
+                    if let id = SessionSync.match(SessionSync.recordName, name) { known.insert(String(id.dropFirst("local_".count))) }
+                    else if let id = SessionSync.match(SessionSync.markerName, name) { known.insert(id) }
+                }
+            }
+        }
+        return sessions.filter { !known.contains($0.sessionId) }
     }
 
-    /// The id ends up in a shell command, so only the characters Claude Code uses for ids pass.
+    /// The id ends up in a link, so only the characters Claude Code uses for ids pass.
     static func isSafe(_ sessionId: String) -> Bool {
         !sessionId.isEmpty && sessionId.unicodeScalars.allSatisfy {
             $0.isASCII && (CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_")

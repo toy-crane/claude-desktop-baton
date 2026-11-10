@@ -26,11 +26,6 @@ func renderSnapshots(to folder: URL) {
     cases.append(("switching", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .switching(accountId: b), now: now)))
     cases.append(("cli", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now,
                                          cli: .account(Identity(account: b, org: org)), cliSaved: [a, b])))
-    let remote = [RemoteSession(sessionId: "b2da6403-1087-5f10-929c-77c6fe7a8aaf",
-                                folder: "/Users/sam/code/shop/.claude/worktrees/bridge-cse_01", name: "Plan the checkout flow"),
-                  RemoteSession(sessionId: "5a1a77f5-8215-5a78-8cc7-db3f78c0e914",
-                                folder: "/Users/sam/code/shop/.claude/worktrees/bridge-cse_02")]
-    cases.append(("remote", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now, remote: remote)))
     usage[b] = UsageEntry(failure: .offline, lastAttempt: now)
     cases.append(("usage-error", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now)))
 
@@ -89,7 +84,6 @@ func renderSnapshots(to folder: URL) {
     // The alerts that replace in-panel switching messages, drawn without showing them.
     let alerts: [(String, AlertContent)] = [
         ("alert-confirm", Alerts.confirmSwitch(to: "Acme · sam", working: 2)),
-        ("alert-confirm-remote", Alerts.confirmSwitch(to: "Acme · sam", working: 0, remote: 2)),
         ("alert-failed", Alerts.switchFailed(to: "Acme · jordan", message: "Claude opened a different account. The saved sign-in may have expired; sign in to it in Claude and it is saved again.", putBack: "Acme · alex")),
         ("alert-sync", Alerts.syncSkipped(to: "Acme · sam", reason: "only 0 of 2 session files look familiar")),
         ("alert-cli", Alerts.cliNotFollowing(to: "Acme · jordan", cli: "Acme · sam")),

@@ -22,11 +22,8 @@ _Avoid_: CLI token, credentials
 The account the CLI is signed in to right now; it can differ from the account Claude Desktop is signed in to.
 
 **Remote Control session**:
-A Claude Code session that a `claude remote-control` server runs on this Mac; it has no Code-tab entry, so a switch leaves it with the account that started the server.
+A Claude Code session that a `claude remote-control` server runs on this Mac; the account that started the server lists it, and it has no Code-tab entry until Claude Desktop opens it.
 _Avoid_: RC session, bridge session
-
-**Resume command**:
-The terminal command the app hands out for a Remote Control session (`cd <folder> && claude --resume <id>`), which continues its conversation under the account the CLI is on.
 
 **Update notice**:
 The dot on the menu bar item (the baton or the usage meter) and the "Update available" row in the panel that say a newer version of this app is ready to install; separate from Sparkle's update window, which opens only from it or from Check for Updates.

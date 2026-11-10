@@ -6,12 +6,16 @@ public protocol ClaudeApp: AnyObject {
     /// Asks Claude to quit normally.
     func quit()
     func open() async throws
+    /// Opens a `claude://` link in Claude, as Claude Code's `/desktop` command does.
+    func open(link: URL) async throws
 }
 
 public struct SwitchTiming: Sendable {
     public var quitTimeout: Duration = .seconds(45)
     public var loadTimeout: Duration = .seconds(45)
     public var poll: Duration = .milliseconds(250)
+    /// Between two links handed to Claude, so each session is taken over before the next arrives.
+    public var linkGap: Duration = .seconds(2)
     public init() {}
 }
 
@@ -29,6 +33,8 @@ public struct SwitchResult: Sendable {
     public var signInChanged = false
     /// What happened to the Claude Code CLI; nil when the switch did not reach it.
     public var cli: CLIFollow?
+    /// Remote Control sessions handed to Claude Desktop after the switch, so they are listed under the target.
+    public var remoteOpened: [RemoteSession] = []
 }
 
 public final class Switcher: @unchecked Sendable {
@@ -51,14 +57,31 @@ public final class Switcher: @unchecked Sendable {
     }
 
     /// Quit Claude, re-save the outgoing sign-in, sync sessions, put the target's sign-in
-    /// in place, reopen Claude and wait for it to confirm the target account.
+    /// in place, reopen Claude, wait for it to confirm the target account, then hand it the
+    /// running Remote Control sessions it has no record of.
     public func switchTo(_ target: SavedAccount, progress: @Sendable (SwitchStep) -> Void = { _ in }) async -> SwitchResult {
         let outgoing = ClaudeLog.current(claude.log)
         if outgoing?.account == target.accountId && app.isRunning { return SwitchResult(previous: outgoing) }
         var result = await restart(into: target.signIn, expecting: target.accountId, outgoing: outgoing, progress: progress)
         // The CLI follows only once Claude has confirmed the target, so a failed switch never splits them.
         if result.error == nil, let cli { result.cli = cli.follow(target) }
+        if result.error == nil { result.remoteOpened = await handOverRemoteSessions() }
         return result
+    }
+
+    /// Remote Control sessions are listed by the account that started their server and have no record
+    /// to sync. Once Claude is open on the target, each one without a record is opened with the link
+    /// `/desktop` uses; Claude writes the record itself, and every later switch syncs it like any other.
+    private func handOverRemoteSessions() async -> [RemoteSession] {
+        let waiting = RemoteSessions.notInClaudeDesktop(RemoteSessions.running(registry: claude.cliSessions),
+                                                        sessionsRoot: claude.sessionsRoot)
+        var opened: [RemoteSession] = []
+        for session in waiting {
+            guard let link = session.desktopLink else { continue }
+            if !opened.isEmpty { try? await Task.sleep(for: timing.linkGap) }
+            if (try? await app.open(link: link)) != nil { opened.append(session) }
+        }
+        return opened
     }
 
     /// Like a switch, but Claude reopens signed out on this Mac only, so another account can sign in.

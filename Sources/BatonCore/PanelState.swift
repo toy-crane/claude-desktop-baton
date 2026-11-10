@@ -43,13 +43,12 @@ public struct AccountRow: Equatable, Sendable, Identifiable {
 }
 
 public enum SwitchDecision: Equatable, Sendable {
-    case none, confirm(working: Int, remote: Int = 0), start
+    case none, confirm(working: Int), start
 
-    /// Clicking an account: the current one does nothing; another asks first when sessions are working,
-    /// or when Remote Control sessions are running that the switch will not carry over.
-    public static func onSelect(_ accountId: String, current: Identity?, working: Int, remote: Int = 0) -> SwitchDecision {
+    /// Clicking an account: the current one does nothing; another asks first when sessions are working.
+    public static func onSelect(_ accountId: String, current: Identity?, working: Int) -> SwitchDecision {
         if accountId == current?.account { return .none }
-        return working > 0 || remote > 0 ? .confirm(working: working, remote: remote) : .start
+        return working > 0 ? .confirm(working: working) : .start
     }
 }
 
@@ -64,17 +63,11 @@ public struct AlertContent: Equatable, Sendable {
 }
 
 public enum Alerts {
-    public static func confirmSwitch(to name: String, working: Int, remote: Int = 0) -> AlertContent {
-        var parts: [String] = []
-        if working > 0 {
-            let sessions = working == 1 ? "1 session is" : "\(working) sessions are"
-            parts.append("\(sessions) working in Claude. Switching restarts Claude, which stops them; you can resume them afterwards.")
-        }
-        if remote > 0 {
-            let sessions = remote == 1 ? "1 Remote Control session stays" : "\(remote) Remote Control sessions stay"
-            parts.append("\(sessions) with the current account.")
-        }
-        return AlertContent(title: "Switch to \(name)?", message: parts.joined(separator: "\n\n"), buttons: ["Switch", "Cancel"])
+    public static func confirmSwitch(to name: String, working: Int) -> AlertContent {
+        let sessions = working == 1 ? "1 session is" : "\(working) sessions are"
+        return AlertContent(title: "Switch to \(name)?",
+                            message: "\(sessions) working in Claude. Switching restarts Claude, which stops them; you can resume them afterwards.",
+                            buttons: ["Switch", "Cancel"])
     }
 
     public static func switchFailed(to name: String, message: String, putBack: String?) -> AlertContent {
@@ -141,16 +134,9 @@ public struct PanelState: Equatable, Sendable {
     public let updated: String?
     /// For the "⋯" menu when no saved account carries the CLI tag: "CLI: signed out", "CLI: not on a saved account".
     public var cliNote: String?
-    /// Remote Control sessions running on this Mac, which no switch carries over; the panel offers their resume commands.
-    public var remote: [RemoteSession] = []
-    /// "2 Remote Control sessions", nil when none are running.
-    public var remoteNote: String? {
-        remote.isEmpty ? nil : (remote.count == 1 ? "1 Remote Control session" : "\(remote.count) Remote Control sessions")
-    }
 
     public static func make(accounts: [SavedAccount], current: Identity?, usage: [String: UsageEntry],
-                            phase: Phase, now: Date, cli: CLIState? = nil, cliSaved: Set<String> = [],
-                            remote: [RemoteSession] = []) -> PanelState {
+                            phase: Phase, now: Date, cli: CLIState? = nil, cliSaved: Set<String> = []) -> PanelState {
         let names = displayNames(accounts)
         var target: String?
         let busy: Bool
@@ -199,6 +185,6 @@ public struct PanelState: Equatable, Sendable {
         case .signedOut?: cliNote = "CLI: signed out"
         case .account?: cliNote = rows.contains(where: \.isCLI) ? nil : "CLI: not on a saved account"
         }
-        return PanelState(rows: rows, busy: busy, updated: updated, cliNote: cliNote, remote: remote)
+        return PanelState(rows: rows, busy: busy, updated: updated, cliNote: cliNote)
     }
 }

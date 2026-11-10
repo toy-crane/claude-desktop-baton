@@ -23,4 +23,8 @@ final class LiveClaude: ClaudeApp, @unchecked Sendable {
         configuration.activates = true
         _ = try await NSWorkspace.shared.openApplication(at: Self.appURL, configuration: configuration)
     }
+
+    func open(link: URL) async throws {
+        _ = try await NSWorkspace.shared.open([link], withApplicationAt: Self.appURL, configuration: NSWorkspace.OpenConfiguration())
+    }
 }

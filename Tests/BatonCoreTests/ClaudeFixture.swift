@@ -22,6 +22,7 @@ final class ClaudeFixture {
         t.quitTimeout = .milliseconds(300)
         t.loadTimeout = .milliseconds(300)
         t.poll = .milliseconds(10)
+        t.linkGap = .milliseconds(1)
         return t
     }
 
@@ -110,6 +111,15 @@ final class ClaudeFixture {
         try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-secondsAgo)], ofItemAtPath: file.path)
     }
 
+    /// A session a Remote Control server is running, as Claude Code registers it. The pid is this test process: alive.
+    func registerRemoteSession(_ sessionId: String, slot: Int = 0) throws {
+        try FileManager.default.createDirectory(at: claude.cliSessions, withIntermediateDirectories: true)
+        let body: [String: Any] = ["pid": Int(ProcessInfo.processInfo.processIdentifier), "sessionId": sessionId,
+                                   "cwd": "/Users/someone/code/shop/.claude/worktrees/bridge-cse_\(slot)",
+                                   "entrypoint": "sdk-cli", "bridgeSessionId": "session_\(slot)", "nameSource": "derived"]
+        try JSONSerialization.data(withJSONObject: body).write(to: claude.cliSessions.appendingPathComponent("\(slot).json"))
+    }
+
     func hasSession(_ account: String, _ uuid: String) -> Bool {
         FileManager.default.fileExists(atPath: folder(account).appendingPathComponent("local_\(uuid).json").path)
     }
@@ -124,6 +134,8 @@ final class FakeClaude: ClaudeApp, @unchecked Sendable {
     /// Simulates an expired saved sign-in: Claude loads this account instead.
     var loadsInstead: String?
     var opened = 0
+    /// Links handed to Claude, in order.
+    var links: [URL] = []
     /// Called when Claude opens, to observe what was in place at that moment.
     var onOpen: (() -> Void)?
 
@@ -131,6 +143,8 @@ final class FakeClaude: ClaudeApp, @unchecked Sendable {
 
     var isRunning: Bool { running }
     func quit() { if !refusesToQuit { running = false } }
+
+    func open(link: URL) async throws { links.append(link) }
 
     func open() async throws {
         running = true

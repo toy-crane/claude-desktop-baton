@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import BatonCore
 
-/// Remote Control sessions have no record a switch could copy, so the app only finds them
-/// and hands out their resume commands. Registry entries are shaped like Claude Code 2.1.319's.
+/// Remote Control sessions have no record a switch could copy, so the app finds them and hands
+/// them to Claude Desktop after a switch. Registry entries are shaped like Claude Code 2.1.319's.
 @Suite("Remote Control sessions")
 struct RemoteSessionsTests {
     let registry: URL
@@ -73,17 +73,15 @@ struct RemoteSessionsTests {
         #expect(running(alive: [1]).map(\.openElsewhere) == [false])
     }
 
-    @Test func theResumeCommandOpensTheSessionInItsOwnFolder() {
+    // The link Claude Code's `/desktop` opens; tried on this Mac on 2026-11-10, Claude wrote the record itself.
+    @Test func aSessionIsHandedToClaudeDesktopWithTheLinkDesktopCommandUses() {
         let session = RemoteSession(sessionId: "b2da6403-1087-5f10-929c-77c6fe7a8aaf", folder: worktree)
-        let quoted = RemoteSession(sessionId: "abc", folder: "/Users/someone/it's here/repo")
 
-        #expect(session.resumeCommand == "cd '\(worktree)' && claude --resume b2da6403-1087-5f10-929c-77c6fe7a8aaf")
-        #expect(quoted.resumeCommand == #"cd '/Users/someone/it'\''s here/repo' && claude --resume abc"#)
-        #expect(quoted.project == "repo")
-        #expect(RemoteSessions.resumeCommands([session, quoted]).split(separator: "\n").count == 2)
+        #expect(session.desktopLink?.absoluteString == "claude://resume?session=b2da6403-1087-5f10-929c-77c6fe7a8aaf")
+        #expect(RemoteSession(sessionId: "abc", folder: "/Users/someone/it's here/repo").project == "repo")
     }
 
-    // The id goes into a shell command: an entry whose id is not id-shaped is left out.
+    // The id goes into a link: an entry whose id is not id-shaped is left out.
     @Test func entriesThatAreNotWhatClaudeCodeWritesAreIgnored() throws {
         try register(pid: 1, session: "x; rm -rf ~", cwd: worktree)
         try Data("not json".utf8).write(to: registry.appendingPathComponent("2.json"))
@@ -102,42 +100,22 @@ struct RemoteSessionsTests {
         #expect(running().map(\.title) == ["dearly · A", "dearly · B", "playbook · 33333333"])
     }
 
-    // MARK: what the switch says about them
+    // MARK: what a switch does with them
 
-    @Test func selectingAnotherAccountAsksFirstWhenRemoteControlSessionsAreRunning() {
-        let current = Identity(account: ClaudeFixture.a, org: ClaudeFixture.org)
+    @Test func onlySessionsClaudeDesktopHasNoRecordOfAreHandedOver() throws {
+        let f = try ClaudeFixture(signedIn: ClaudeFixture.a)
+        let new = RemoteSession(sessionId: "11111111-1111-4111-8111-111111111111", folder: worktree)
+        let listed = RemoteSession(sessionId: "22222222-2222-4222-8222-222222222222", folder: worktree)
+        let deleted = RemoteSession(sessionId: "33333333-3333-4333-8333-333333333333", folder: worktree)
+        // Taken over under another account earlier: its record is somewhere, and the sync carries it.
+        try f.writeSession(ClaudeFixture.c, listed.sessionId, secondsAgo: 60)
+        // Deleted in Claude: the marker stays, and the session is not brought back at every switch.
+        try Data("1".utf8).write(to: f.folder(ClaudeFixture.b).appendingPathComponent("deleted_\(deleted.sessionId)"))
 
-        #expect(SwitchDecision.onSelect(ClaudeFixture.b, current: current, working: 0, remote: 2) == .confirm(working: 0, remote: 2))
-        #expect(SwitchDecision.onSelect(ClaudeFixture.b, current: current, working: 1, remote: 2) == .confirm(working: 1, remote: 2))
-        #expect(SwitchDecision.onSelect(ClaudeFixture.a, current: current, working: 0, remote: 2) == .none)
-        #expect(SwitchDecision.onSelect(ClaudeFixture.b, current: current, working: 0, remote: 0) == .start)
+        #expect(RemoteSessions.notInClaudeDesktop([new, listed, deleted], sessionsRoot: f.claude.sessionsRoot) == [new])
     }
 
-    // User's change: the alert only asks whether to switch; resume commands live in the panel.
-    @Test func theConfirmationOnlyAsksWhetherToSwitch() {
-        let alert = Alerts.confirmSwitch(to: "Acme · sam", working: 0, remote: 2)
-        let both = Alerts.confirmSwitch(to: "Acme · sam", working: 1, remote: 1)
-
-        #expect(alert.title == "Switch to Acme · sam?")
-        #expect(alert.message == "2 Remote Control sessions stay with the current account.")
-        #expect(alert.buttons == ["Switch", "Cancel"])
-        #expect(both.message.hasPrefix("1 session is working in Claude."))
-        #expect(both.message.hasSuffix("\n\n1 Remote Control session stays with the current account."))
-    }
-
-    @Test func thePanelCountsRemoteControlSessions() {
-        func state(_ remote: [RemoteSession]) -> PanelState {
-            PanelState.make(accounts: [], current: nil, usage: [:], phase: .idle, now: Date(), remote: remote)
-        }
-        let one = RemoteSession(sessionId: "a", folder: worktree), two = RemoteSession(sessionId: "b", folder: worktree)
-
-        #expect(state([]).remoteNote == nil)
-        #expect(state([one]).remoteNote == "1 Remote Control session")
-        #expect(state([one, two]).remoteNote == "2 Remote Control sessions")
-        #expect(state([one, two]).remote == [one, two])
-    }
-
-    @Test func statusListsRemoteControlSessionsWithTheirResumeCommands() async throws {
+    @Test func statusListsRemoteControlSessions() async throws {
         let f = try ClaudeFixture(signedIn: ClaudeFixture.a)
         let session = RemoteSession(sessionId: "b2da6403-1087-5f10-929c-77c6fe7a8aaf", folder: worktree,
                                     name: "Plan the memory layout", openElsewhere: true)
@@ -155,11 +133,10 @@ struct RemoteSessionsTests {
 
         #expect(text.text.contains("Remote Control sessions running (1)"))
         #expect(text.text.contains("dearly · Plan the memory layout  (also open in another program)"))
-        #expect(text.text.contains(session.resumeCommand))
         let body = try #require(try JSONSerialization.jsonObject(with: Data(json.text.utf8)) as? [String: Any])
         let rows = try #require(body["remoteControlSessions"] as? [[String: Any]])
         #expect(rows.count == 1)
-        #expect(rows[0]["resumeCommand"] as? String == session.resumeCommand)
+        #expect(rows[0]["sessionId"] as? String == session.sessionId)
         #expect(rows[0]["openElsewhere"] as? Bool == true)
         #expect(rows[0]["title"] as? String == "dearly · Plan the memory layout")
     }

@@ -116,7 +116,7 @@ public struct StatusFacts: Sendable {
     public var workingSessions: Int
     public var legacyImportable: Int
     public var syncPreview: String
-    /// Remote Control sessions running on this Mac; a switch leaves them with the account that started them.
+    /// Remote Control sessions running on this Mac; a switch hands Claude Desktop the ones it does not list yet.
     public var remoteSessions: [RemoteSession]
     public init(claudeRunning: Bool, menuBarAppRunning: Bool, workingSessions: Int, legacyImportable: Int, syncPreview: String,
                 remoteSessions: [RemoteSession] = []) {
@@ -264,7 +264,7 @@ public enum AgentCommand {
                 "workingSessions": facts.workingSessions,
                 "remoteControlSessions": facts.remoteSessions.map {
                     ["title": $0.title, "sessionId": $0.sessionId, "folder": $0.folder,
-                     "openElsewhere": $0.openElsewhere, "resumeCommand": $0.resumeCommand] as [String: Any]
+                     "openElsewhere": $0.openElsewhere] as [String: Any]
                 },
                 "legacyAccountsToImport": facts.legacyImportable,
                 "syncPreview": facts.syncPreview,
@@ -283,12 +283,8 @@ public enum AgentCommand {
                   "Sessions working in the last 2 minutes: \(facts.workingSessions)",
                   "A switch now would sync: \(facts.syncPreview)"]
         if !facts.remoteSessions.isEmpty {
-            lines.append("Remote Control sessions running (\(facts.remoteSessions.count)); a switch leaves them with the account that started them:")
-            for session in facts.remoteSessions {
-                lines.append("  \(session.title)\(session.openElsewhere ? "  (also open in another program)" : "")")
-                lines.append("    \(session.resumeCommand)")
-            }
-            lines.append("  Stop a session's Remote Control server before resuming it elsewhere.")
+            lines.append("Remote Control sessions running (\(facts.remoteSessions.count)); a switch opens the ones Claude Desktop does not list yet:")
+            lines += facts.remoteSessions.map { "  \($0.title)\($0.openElsewhere ? "  (also open in another program)" : "")" }
         }
         return AgentOutput(text: lines.joined(separator: "\n"), code: Exit.success)
     }
@@ -422,7 +418,7 @@ public enum AgentCommand {
     Commands:
       accounts             Saved accounts in panel order; the one Claude Desktop is signed in to is marked.
       status               Claude and the menu bar app running?, signed-in account, working sessions, what a switch would sync,
-                           and the Remote Control sessions a switch leaves behind, each with its resume command.
+                           and the Remote Control sessions running on this Mac.
       usage [--refresh]    Session (5-hour) and Week percent used per account. Values fetched in the last
                            2 minutes are reused; --refresh fetches again.
       switch <account>     Switch Claude Desktop to an account: its name, email, or the start of its account id.
