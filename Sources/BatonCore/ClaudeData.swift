@@ -6,16 +6,20 @@ public struct ClaudePaths: Sendable {
     public let log: URL
     /// Claude Code conversations, shared by every account: <project>/<cliSessionId>.jsonl.
     public let projects: URL
+    /// Claude Code's registry of running sessions, one file per process: <pid>.json.
+    public let cliSessions: URL
 
     public var config: URL { dataDir.appendingPathComponent("config.json") }
     public var cookies: URL { dataDir.appendingPathComponent("Cookies") }
     public var sessionsRoot: URL { dataDir.appendingPathComponent("claude-code-sessions") }
 
     public init(dataDir: URL, log: URL,
-                projects: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/projects")) {
+                projects: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/projects"),
+                cliSessions: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/sessions")) {
         self.dataDir = dataDir
         self.log = log
         self.projects = projects
+        self.cliSessions = cliSessions
     }
 
     public static let live = ClaudePaths(

@@ -32,6 +32,46 @@ struct SwitcherTests {
         #expect(f.fake.opened == 1)
     }
 
+    // Remote Control sessions are listed by the account that started their server, so the sync has nothing
+    // to copy: once Claude confirms the target, each is opened the way `/desktop` opens it.
+    @Test func runningRemoteControlSessionsAreHandedToClaudeAfterItConfirmsTheTarget() async throws {
+        let (f, b) = try twoSavedAccounts()
+        try f.registerRemoteSession("aaaa1111-1111-4111-8111-111111111111", slot: 1)
+        try f.registerRemoteSession("bbbb2222-2222-4222-8222-222222222222", slot: 2)
+
+        let result = await f.switcher.switchTo(b)
+
+        #expect(result.error == nil)
+        #expect(f.fake.links.map(\.absoluteString).sorted() == ["claude://resume?session=aaaa1111-1111-4111-8111-111111111111",
+                                                                 "claude://resume?session=bbbb2222-2222-4222-8222-222222222222"])
+        #expect(result.remoteOpened.count == 2)
+        #expect(f.configAccount == B)
+    }
+
+    @Test func aRemoteControlSessionClaudeAlreadyListsIsNotOpenedAgain() async throws {
+        let (f, b) = try twoSavedAccounts()
+        try f.registerRemoteSession(s1)
+        try f.writeSession(A, s1, secondsAgo: 60)
+
+        let result = await f.switcher.switchTo(b)
+
+        #expect(result.error == nil)
+        #expect(f.fake.links.isEmpty)
+        #expect(f.hasSession(B, s1))
+    }
+
+    @Test func aFailedSwitchHandsNoRemoteControlSessionToClaude() async throws {
+        let (f, b) = try twoSavedAccounts()
+        try f.registerRemoteSession(s1)
+        f.fake.loadsInstead = A
+
+        let result = await f.switcher.switchTo(b)
+
+        #expect(result.error != nil)
+        #expect(f.fake.links.isEmpty)
+        #expect(result.remoteOpened.isEmpty)
+    }
+
     // AC1 / AC2: sessions are brought in line during the switch, while Claude is closed.
     @Test func sessionsAreSyncedWhileClaudeIsClosedBeforeItReopens() async throws {
         let (f, b) = try twoSavedAccounts()

@@ -21,6 +21,10 @@ _Avoid_: CLI token, credentials
 **CLI account**:
 The account the CLI is signed in to right now; it can differ from the account Claude Desktop is signed in to.
 
+**Remote Control session**:
+A Claude Code session that a `claude remote-control` server runs on this Mac; the account that started the server lists it, and it has no Code-tab entry until Claude Desktop opens it.
+_Avoid_: RC session, bridge session
+
 **Update notice**:
 The dot on the menu bar item (the baton or the usage meter) and the "Update available" row in the panel that say a newer version of this app is ready to install; separate from Sparkle's update window, which opens only from it or from Check for Updates.
 _Avoid_: Update alert, update popup
