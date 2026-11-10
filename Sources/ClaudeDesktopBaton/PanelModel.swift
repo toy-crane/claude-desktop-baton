@@ -25,6 +25,8 @@ final class PanelModel {
     private(set) var cliState: CLIState?
     private(set) var cliSaved: Set<String> = []
     private(set) var now = Date()
+    /// What the menu bar item shows and how, chosen in the "⋯" menu and kept across launches.
+    private(set) var menuBarStyle = MenuBarStyle.load()
     private var addingSince: Date?
     /// Claude's log size when it reopened signed out; any account loading after it ends adding.
     @ObservationIgnored private var addingLogOffset: UInt64?
@@ -40,7 +42,13 @@ final class PanelModel {
     /// A switch, an account add, or an update about to quit the app: no new switch may start.
     var isBusy: Bool { state.busy || updater.isInstalling }
     var menuBar: MenuBarLabel {
-        MenuBarLabel.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now)
+        MenuBarLabel.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now,
+                          content: menuBarStyle.content)
+    }
+
+    func setMenuBarStyle(_ style: MenuBarStyle) {
+        menuBarStyle = style
+        style.save()
     }
 
     init(claude: ClaudePaths = .live, paths: AppPaths = .live) {

@@ -18,11 +18,11 @@ struct BatonApp: App {
     var body: some Scene {
         MenuBarExtra {
             PanelView(state: model.state, launchAtLogin: model.launchAtLogin, commandLineInstalled: model.commandLineInstalled,
-                      update: model.updater.notice.version,
+                      update: model.updater.notice.version, menuBarStyle: model.menuBarStyle,
                       actions: PanelActions(
                 select: model.select, addAccount: model.addAccount, requestRemove: model.requestRemove,
                 setLaunchAtLogin: model.setLaunchAtLogin, installCommandLine: model.installCommandLine,
-                checkForUpdates: model.checkForUpdates,
+                checkForUpdates: model.checkForUpdates, setMenuBarStyle: model.setMenuBarStyle,
                 about: model.showAbout, quit: model.quit))
             .onAppear { model.panelOpened() }
         } label: {
@@ -35,7 +35,7 @@ struct BatonApp: App {
                 Image(nsImage: updateDot ? AppIcon.menuBarWithDot : AppIcon.menuBar)
                     .accessibilityLabel(updateDot ? "Claude Desktop Baton: update available" : "Claude Desktop Baton")
             case .usage(let usage):
-                Image(nsImage: MenuBarMeter.image(usage, updateDot: updateDot))
+                Image(nsImage: MenuBarMeter.image(usage, style: model.menuBarStyle, updateDot: updateDot))
                     .accessibilityLabel(updateDot ? usage.accessibility + ", update available" : usage.accessibility)
             }
         }

@@ -89,4 +89,17 @@ struct UsageTests {
         #expect(UsageSchedule.isDue(lastAttempt: now.addingTimeInterval(-61), now: now, panelOpening: true))
         #expect(!UsageSchedule.isDue(lastAttempt: now.addingTimeInterval(-30), now: now, panelOpening: true))
     }
+
+    // The panel's reset text: the time until it within a day, the weekday and time beyond that.
+    @Test func aResetWithinADayShowsTheTimeUntilItAndLaterOnesTheWeekdayAndTime() {
+        let now = Date(timeIntervalSince1970: 1_793_000_000)   // Monday 2026-10-26 07:33 UTC
+        let utc = TimeZone(identifier: "UTC")!, en = Locale(identifier: "en_US")
+
+        #expect(UsageText.resetLabel(now.addingTimeInterval(72 * 60), from: now, locale: en, timeZone: utc) == "1h 12m")
+        #expect(UsageText.resetLabel(now.addingTimeInterval(23 * 3600 + 59 * 60), from: now, locale: en, timeZone: utc) == "23h 59m")
+        let later = UsageText.resetLabel(now.addingTimeInterval(4 * 86_400), from: now, locale: en, timeZone: utc)
+        #expect(later.hasPrefix("Fri"))
+        #expect(later.contains("7:33"))
+        #expect(UsageText.resetLabel(now.addingTimeInterval(86_400), from: now, locale: en, timeZone: utc).hasPrefix("Tue"))
+    }
 }

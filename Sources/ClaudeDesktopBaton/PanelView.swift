@@ -26,6 +26,7 @@ struct PanelActions {
     var setLaunchAtLogin: (Bool) -> Void = { _ in }
     var installCommandLine: () -> Void = {}
     var checkForUpdates: () -> Void = {}
+    var setMenuBarStyle: (MenuBarStyle) -> Void = { _ in }
     var about: () -> Void = {}
     var quit: () -> Void = {}
 }
@@ -36,6 +37,7 @@ struct PanelView: View {
     var commandLineInstalled = false
     /// The newer version the update notice offers; nil hides its row.
     var update: String?
+    var menuBarStyle = MenuBarStyle()
     var actions = PanelActions()
     /// Image snapshots cannot draw AppKit-backed menus; they show the menu's own label instead.
     var forSnapshot = false
@@ -47,13 +49,13 @@ struct PanelView: View {
             if let signedIn = state.signedIn {
                 SectionLabel(text: "Signed in", palette: p)
                 AccountBlock(row: signedIn, actions: actions, prominent: true)
-                    .padding(.horizontal, 6).padding(.bottom, 6)
+                    .padding(.horizontal, PanelSpacing.edge).padding(.bottom, PanelSpacing.edge)
                 Rectangle().fill(p.border).frame(height: 1)
             }
             if !state.switchTo.isEmpty {
                 SectionLabel(text: "Switch to", palette: p)
             }
-            VStack(spacing: 2) {
+            VStack(spacing: PanelSpacing.tight) {
                 ForEach(state.switchTo) { row in
                     AccountBlock(row: row, actions: actions)
                 }
@@ -63,8 +65,8 @@ struct PanelView: View {
                         .frame(maxWidth: .infinity, alignment: .leading).padding(10)
                 }
             }
-            .padding(.horizontal, 6)
-            .padding(.bottom, 6)
+            .padding(.horizontal, PanelSpacing.edge)
+            .padding(.bottom, PanelSpacing.edge)
             if let update {
                 Rectangle().fill(p.border).frame(height: 1)
                 updateRow(update, p)
@@ -120,6 +122,21 @@ struct PanelView: View {
                 if let updated = state.updated { Text(updated) }
                 if let cliNote = state.cliNote { Text(cliNote) }
                 Toggle("Launch at login", isOn: Binding(get: { launchAtLogin }, set: actions.setLaunchAtLogin))
+                Menu("Menu bar") {
+                    Picker("Show", selection: Binding(get: { menuBarStyle.content }, set: { content in
+                        actions.setMenuBarStyle(MenuBarStyle(content: content, layout: menuBarStyle.layout))
+                    })) {
+                        ForEach(MenuBarContent.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                    Picker("Usage layout", selection: Binding(get: { menuBarStyle.layout }, set: { layout in
+                        actions.setMenuBarStyle(MenuBarStyle(content: menuBarStyle.content, layout: layout))
+                    })) {
+                        ForEach(MenuBarLayout.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                    .disabled(menuBarStyle.content == .icon)
+                }
                 Menu("Remove account") {
                     ForEach(state.rows) { row in Button(row.name) { actions.requestRemove(row.id) } }
                 }
@@ -169,8 +186,21 @@ struct SectionLabel: View {
             .font(.system(size: 10.5, weight: .semibold)).tracking(0.6)
             .foregroundStyle(palette.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16).padding(.top, 9).padding(.bottom, 2)
+            .padding(.horizontal, PanelSpacing.edge + PanelSpacing.inset).padding(.top, PanelSpacing.inset).padding(.bottom, PanelSpacing.tight)
     }
+}
+
+/// The panel's spacing. Every account block uses these, so the signed-in account and the others
+/// differ only in the size of the name.
+enum PanelSpacing {
+    /// The panel's edge.
+    static let edge: CGFloat = 6
+    /// Inside an account block, on every side.
+    static let inset: CGFloat = 10
+    /// Between a limit's text and its bar, a name and its email, and one block and the next.
+    static let tight: CGFloat = 4
+    /// Between a name and the first limit, and between limits.
+    static let gap: CGFloat = 8
 }
 
 struct AccountBlock: View {
@@ -182,7 +212,7 @@ struct AccountBlock: View {
 
     var body: some View {
         let p = Palette(scheme)
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 if row.isTarget { lead(p) }
                 Text(row.name).font(.system(size: prominent ? 15 : 13, weight: prominent ? .semibold : .medium))
@@ -197,18 +227,15 @@ struct AccountBlock: View {
                     Image(systemName: "exclamationmark.circle").font(.system(size: 11)).foregroundStyle(p.muted).help(reason)
                 }
                 Spacer(minLength: 6)
-                if let note = row.resetNote {
-                    Text("↻ \(note)").font(.system(size: 11, design: .monospaced)).foregroundStyle(p.muted)
-                }
             }
             if prominent, let email = row.email {
-                Text(email).font(.system(size: 11.5)).foregroundStyle(p.muted).lineLimit(1).padding(.leading, 14).padding(.top, -4)
+                Text(email).font(.system(size: 11.5)).foregroundStyle(p.muted).lineLimit(1)
+                    .padding(.top, PanelSpacing.tight)
             }
-            meter("Session", row.session, p)
-            meter("Week", row.week, p)
+            limit("5-hour limit", row.session, p).padding(.top, PanelSpacing.gap)
+            limit("Weekly", row.week, p).padding(.top, PanelSpacing.gap)
         }
-        .padding(.vertical, 9)
-        .padding(.horizontal, 10)
+        .padding(PanelSpacing.inset)
         .background(RoundedRectangle(cornerRadius: 8).fill(hovering && !row.isCurrent && !row.isDisabled ? p.hover : .clear))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
@@ -225,9 +252,24 @@ struct AccountBlock: View {
         }
     }
 
-    private func meter(_ label: String, _ meter: Meter, _ p: Palette) -> some View {
-        HStack(spacing: 8) {
-            Text(label).font(.system(size: 11, design: .monospaced)).foregroundStyle(p.muted).frame(width: 54, alignment: .leading)
+    /// The limit's name, when it resets and the percent used on one line; its bar underneath.
+    private func limit(_ label: String, _ meter: Meter, _ p: Palette) -> some View {
+        VStack(alignment: .leading, spacing: PanelSpacing.tight) {
+            HStack(spacing: 8) {
+                Text(label).font(.system(size: 12.5)).lineLimit(1)
+                Spacer(minLength: 6)
+                // The reset sits close to the percent; the percent has just the width "100%" needs, so every
+                // reset ends at the same place without a wide gap after a short percent.
+                HStack(spacing: 4) {
+                    if let reset = meter.reset {
+                        Text("↻ \(reset)").font(.system(size: 11.5)).monospacedDigit().foregroundStyle(p.muted).lineLimit(1)
+                    }
+                    Text(meter.text).font(.system(size: 12.5)).monospacedDigit()
+                        .foregroundStyle(meter.atLimit ? p.danger : p.ink)
+                        .lineLimit(1)
+                        .frame(width: 36, alignment: .trailing)
+                }
+            }
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule().fill(p.track)
@@ -235,11 +277,7 @@ struct AccountBlock: View {
                 }
             }
             .frame(height: 4)
-            Text(meter.text).font(.system(size: 11.5, design: .monospaced)).monospacedDigit()
-                .foregroundStyle(meter.atLimit ? p.danger : p.ink)
-                .frame(width: 38, alignment: .trailing)
         }
-        .padding(.leading, 14)
     }
 }
 

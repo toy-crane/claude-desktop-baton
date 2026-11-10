@@ -46,6 +46,13 @@ public enum UsageText {
         return "\(Int(used.rounded()))%"
     }
 
+    /// When a reset happens, for the panel: the time until it within a day ("1h 12m"), otherwise the
+    /// weekday and time ("Thu 11:00 AM"), which is easier to read for a reset days away.
+    public static func resetLabel(_ date: Date, from now: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
+        guard date.timeIntervalSince(now) >= 24 * 60 * 60 else { return until(date, from: now) }
+        return date.formatted(Date.FormatStyle(locale: locale, timeZone: timeZone).weekday(.abbreviated).hour().minute())
+    }
+
     /// Time until a reset: "1h 12m", "13m", "2d 2h".
     public static func until(_ date: Date, from now: Date) -> String {
         let minutes = Int((date.timeIntervalSince(now) / 60).rounded(.up))
