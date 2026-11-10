@@ -2,11 +2,14 @@ import BatonCore
 import SwiftUI
 
 struct BatonApp: App {
-    @State private var model = PanelModel()
+    /// One model for the app's life, owned here rather than by `@State`: read in `init`, a `@State`
+    /// value is not the instance SwiftUI later hands to `body`, so the model that was started was
+    /// released at once and the panel showed one that never loaded the saved accounts.
+    private static let shared = PanelModel()
+    private var model: PanelModel { Self.shared }
 
     init() {
-        let model = _model.wrappedValue
-        DispatchQueue.main.async { model.start() }
+        DispatchQueue.main.async { Self.shared.start() }
     }
 
     /// The update notice's dot, drawn on whichever menu bar item is showing.

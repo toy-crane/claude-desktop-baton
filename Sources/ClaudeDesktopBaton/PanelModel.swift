@@ -54,6 +54,8 @@ final class PanelModel {
     }
 
     func start() {
+        // SwiftUI may build the App value more than once; the model starts once.
+        guard timer == nil else { return }
         store.importLegacy(from: AppPaths.legacyAccounts)
         setUpLaunchAtLogin()
         // Switches asked for on the command line are carried out here, like a click in the panel.
