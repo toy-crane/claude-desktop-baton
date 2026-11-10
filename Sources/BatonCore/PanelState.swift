@@ -22,6 +22,11 @@ public struct Meter: Equatable, Sendable {
     public let fraction: Double
     public let text: String
     public let atLimit: Bool
+    /// Time until this limit resets, "2d 4h"; nil when unknown.
+    public var reset: String?
+    public init(fraction: Double, text: String, atLimit: Bool, reset: String? = nil) {
+        self.fraction = fraction; self.text = text; self.atLimit = atLimit; self.reset = reset
+    }
 }
 
 public struct AccountRow: Equatable, Sendable, Identifiable {
@@ -32,8 +37,6 @@ public struct AccountRow: Equatable, Sendable, Identifiable {
     public let isDisabled: Bool
     public let session: Meter
     public let week: Meter
-    /// Time until a reached limit resets, shown beside the name.
-    public let resetNote: String?
     /// Why usage is unavailable, shown on hover beside the name.
     public let failureReason: String?
     public let tooltip: String
@@ -148,7 +151,8 @@ public struct PanelState: Equatable, Sendable {
 
         func meter(_ bucket: Usage.Bucket?) -> Meter {
             guard let bucket else { return Meter(fraction: 0, text: "—", atLimit: false) }
-            return Meter(fraction: bucket.used / 100, text: UsageText.percent(bucket.used), atLimit: bucket.isAtLimit)
+            return Meter(fraction: bucket.used / 100, text: UsageText.percent(bucket.used), atLimit: bucket.isAtLimit,
+                         reset: bucket.resetsAt.flatMap { $0 > now ? UsageText.until($0, from: now) : nil })
         }
         func when(_ date: Date?) -> String {
             guard let date else { return "unknown" }
@@ -158,8 +162,6 @@ public struct PanelState: Equatable, Sendable {
         let rows = accounts.map { account -> AccountRow in
             let entry = usage[account.accountId]
             let shown = entry?.failure == nil ? entry?.usage : nil
-            let limited = [shown?.session, shown?.week].compactMap { $0 }.filter(\.isAtLimit)
-            let resetNote = limited.compactMap(\.resetsAt).min().map { UsageText.until($0, from: now) }
             var tooltip = [account.email ?? account.accountId]
             if cli != nil, !cliSaved.contains(account.accountId) { tooltip.append("CLI not signed in yet") }
             if let shown {
@@ -169,7 +171,7 @@ public struct PanelState: Equatable, Sendable {
                               isCurrent: account.accountId == current?.account,
                               isTarget: account.accountId == target, isDisabled: busy,
                               session: meter(shown?.session), week: meter(shown?.week),
-                              resetNote: resetNote, failureReason: entry?.failure?.reason,
+                              failureReason: entry?.failure?.reason,
                               tooltip: tooltip.joined(separator: "\n"), email: account.email,
                               isCLI: cli?.identity.map { $0.account == account.accountId && $0.org == account.orgId } ?? false)
         }

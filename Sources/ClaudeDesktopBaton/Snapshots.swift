@@ -14,9 +14,9 @@ func renderSnapshots(to folder: URL) {
     let a = "aaaaaaaa-0000-4000-8000-000000000001", b = "bbbbbbbb-0000-4000-8000-000000000002", c = "cccccccc-0000-4000-8000-000000000003"
     let accounts = [account(a, "alex@example.com", 1), account(b, "sam@example.com", 2), account(c, "jordan@example.com", 3)]
     var usage: [String: UsageEntry] = [
-        a: UsageEntry(usage: Usage(session: .init(used: 62, resetsAt: now.addingTimeInterval(3600)), week: .init(used: 81, resetsAt: nil)), checked: now.addingTimeInterval(-60)),
-        b: UsageEntry(usage: Usage(session: .init(used: 8, resetsAt: nil), week: .init(used: 34, resetsAt: nil)), checked: now.addingTimeInterval(-60)),
-        c: UsageEntry(usage: Usage(session: .init(used: 100, resetsAt: now.addingTimeInterval(72 * 60 + 20)), week: .init(used: 97, resetsAt: nil)), checked: now.addingTimeInterval(-60)),
+        a: UsageEntry(usage: Usage(session: .init(used: 62, resetsAt: now.addingTimeInterval(3600)), week: .init(used: 81, resetsAt: now.addingTimeInterval(2 * 86_400 + 4 * 3600))), checked: now.addingTimeInterval(-60)),
+        b: UsageEntry(usage: Usage(session: .init(used: 8, resetsAt: now.addingTimeInterval(4 * 3600 + 40 * 60)), week: .init(used: 34, resetsAt: now.addingTimeInterval(5 * 86_400))), checked: now.addingTimeInterval(-60)),
+        c: UsageEntry(usage: Usage(session: .init(used: 100, resetsAt: now.addingTimeInterval(72 * 60 + 20)), week: .init(used: 97, resetsAt: now.addingTimeInterval(18 * 3600))), checked: now.addingTimeInterval(-60)),
     ]
     let current = Identity(account: a, org: org)
     var cases: [(String, PanelState)] = []
@@ -42,7 +42,7 @@ func renderSnapshots(to folder: URL) {
                 let tinted = NSImage(size: template.size, flipped: false) { r in
                     template.draw(in: r); ink.set(); r.fill(using: .sourceAtop); return true
                 }
-                tinted.draw(in: NSRect(x: 13, y: 3, width: image.size.width, height: image.size.height))
+                tinted.draw(in: NSRect(x: 13, y: (24 - image.size.height) / 2, width: image.size.width, height: image.size.height))
                 return true
             }
             let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(width * 4), pixelsHigh: 96, bitsPerSample: 8, samplesPerPixel: 4,
@@ -72,7 +72,12 @@ func renderSnapshots(to folder: URL) {
         var entries = usage
         entries[a] = entry
         if case .usage(let shown) = MenuBarLabel.make(accounts: accounts, current: current, usage: entries, phase: .idle, now: now) {
-            menuBar(MenuBarMeter.image(shown), "menubar-\(name)")
+            for layout in MenuBarLayout.allCases {
+                menuBar(MenuBarMeter.image(shown, style: MenuBarStyle(layout: layout)), "menubar-\(name)-\(layout.rawValue)")
+            }
+            if name == "usage" {
+                menuBar(MenuBarMeter.image(shown, style: MenuBarStyle(content: .iconAndUsage)), "menubar-\(name)-icon")
+            }
         }
     }
     // The update notice's dot, on the baton and on the usage meter.

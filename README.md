@@ -12,7 +12,7 @@ account you switch to, like passing a baton.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/panel-dark.png">
-    <img src="docs/images/panel-light.png" alt="The menu bar panel: the signed-in account on top with its email, and two other accounts below, each with Session and Week usage bars; one account's session limit is reached and shown in red with its reset time." width="300">
+    <img src="docs/images/panel-light.png" alt="The menu bar panel: the signed-in account on top with its email, and two other accounts below, each with Session and Week usage bars, the percent used, and the time until each limit resets; one account's session limit is reached and shown in red." width="300">
   </picture>
 </p>
 
@@ -32,8 +32,8 @@ account you switch to, like passing a baton.
   one in Claude the way Claude Code's `/desktop` does, so it is listed under
   the new account and follows every later switch like any other session.
 - **Usage at a glance.** Each account shows how much of its current session
-  (5-hour) and weekly limits is used. A reached limit turns red with the time
-  until it resets.
+  (5-hour) and weekly limits is used, and how long until each one resets. A
+  reached limit turns red.
 - **Asks before stopping work.** If a Code session was active in the last two
   minutes, switching asks first, because restarting Claude stops running work.
   If a switch fails, you can put the previous account back in one click.
@@ -64,11 +64,16 @@ account you switch to, like passing a baton.
   </picture>
 </p>
 
-In the menu bar it shows the signed-in account's usage: a two-bar meter
-(Session on top, Week below) and the Session percent. When a limit is
-reached, the percent becomes the time until you can use Claude again.
-<img src="docs/images/menubar-light.png" alt="Usage meter and 42% on a light menu bar" height="24">
-<img src="docs/images/menubar-dark.png" alt="Usage meter and 42% on a dark menu bar" height="24">
+In the menu bar it shows the signed-in account's usage: the Session (`5H`) and
+Week (`WK`) percent side by side. When a limit is reached, its percent becomes
+the time until it resets.
+<img src="docs/images/menubar-light.png" alt="5H 42% and WK 18% on a light menu bar" height="24">
+<img src="docs/images/menubar-dark.png" alt="5H 42% and WK 18% on a dark menu bar" height="24">
+
+**Menu bar** in the `⋯` menu changes what the item shows (the icon, usage, or
+both) and how usage is laid out: **Columns** as above, **Bars** (a two-bar
+meter with the Session percent), or **Stack** (two lines, each with its
+percent and the time until it resets).
 
 ## Requirements
 

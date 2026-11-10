@@ -26,6 +26,7 @@ struct PanelActions {
     var setLaunchAtLogin: (Bool) -> Void = { _ in }
     var installCommandLine: () -> Void = {}
     var checkForUpdates: () -> Void = {}
+    var setMenuBarStyle: (MenuBarStyle) -> Void = { _ in }
     var about: () -> Void = {}
     var quit: () -> Void = {}
 }
@@ -36,6 +37,7 @@ struct PanelView: View {
     var commandLineInstalled = false
     /// The newer version the update notice offers; nil hides its row.
     var update: String?
+    var menuBarStyle = MenuBarStyle()
     var actions = PanelActions()
     /// Image snapshots cannot draw AppKit-backed menus; they show the menu's own label instead.
     var forSnapshot = false
@@ -120,6 +122,21 @@ struct PanelView: View {
                 if let updated = state.updated { Text(updated) }
                 if let cliNote = state.cliNote { Text(cliNote) }
                 Toggle("Launch at login", isOn: Binding(get: { launchAtLogin }, set: actions.setLaunchAtLogin))
+                Menu("Menu bar") {
+                    Picker("Show", selection: Binding(get: { menuBarStyle.content }, set: { content in
+                        actions.setMenuBarStyle(MenuBarStyle(content: content, layout: menuBarStyle.layout))
+                    })) {
+                        ForEach(MenuBarContent.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                    Picker("Usage layout", selection: Binding(get: { menuBarStyle.layout }, set: { layout in
+                        actions.setMenuBarStyle(MenuBarStyle(content: menuBarStyle.content, layout: layout))
+                    })) {
+                        ForEach(MenuBarLayout.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                    .disabled(menuBarStyle.content == .icon)
+                }
                 Menu("Remove account") {
                     ForEach(state.rows) { row in Button(row.name) { actions.requestRemove(row.id) } }
                 }
@@ -197,9 +214,6 @@ struct AccountBlock: View {
                     Image(systemName: "exclamationmark.circle").font(.system(size: 11)).foregroundStyle(p.muted).help(reason)
                 }
                 Spacer(minLength: 6)
-                if let note = row.resetNote {
-                    Text("↻ \(note)").font(.system(size: 11, design: .monospaced)).foregroundStyle(p.muted)
-                }
             }
             if prominent, let email = row.email {
                 Text(email).font(.system(size: 11.5)).foregroundStyle(p.muted).lineLimit(1).padding(.leading, 14).padding(.top, -4)
@@ -238,6 +252,11 @@ struct AccountBlock: View {
             Text(meter.text).font(.system(size: 11.5, design: .monospaced)).monospacedDigit()
                 .foregroundStyle(meter.atLimit ? p.danger : p.ink)
                 .frame(width: 38, alignment: .trailing)
+            // Time until this limit resets; the column keeps its width so every bar ends at the same place.
+            Text(meter.reset ?? "").font(.system(size: 11, design: .monospaced)).monospacedDigit()
+                .foregroundStyle(p.muted).lineLimit(1)
+                .frame(width: 48, alignment: .trailing)
+                .help(meter.reset.map { "\(label) resets in \($0)" } ?? "")
         }
         .padding(.leading, 14)
     }
