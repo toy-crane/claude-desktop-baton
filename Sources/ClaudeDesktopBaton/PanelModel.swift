@@ -158,9 +158,7 @@ final class PanelModel {
         guard decision != .none else { return }
         closePanel()
         if case .confirm(let working, let remoteCount) = decision {
-            let choice = show(Alerts.confirmSwitch(to: name(id), working: working, remote: remoteCount))
-            guard choice == 0 || (choice == 2 && remoteCount > 0) else { return }
-            if choice == 2 { copy(RemoteSessions.resumeCommands(remote)) }
+            guard show(Alerts.confirmSwitch(to: name(id), working: working, remote: remoteCount)) == 0 else { return }
         }
         startSwitch(to: id)
     }

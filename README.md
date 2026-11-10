@@ -29,9 +29,9 @@ account you switch to, like passing a baton.
 - **Says what a switch leaves behind.** Sessions run by a Remote Control server
   (`claude remote-control`) are not Code-tab entries, so no switch carries them:
   they keep running and stay listed under the account that started the server.
-  The switch asks first and can copy each session's resume command
-  (`cd <folder> && claude --resume <id>`); the panel's **Resume…** menu and
-  `claude-desktop-baton status` list them too.
+  The switch asks first. The panel's **Resume…** menu and
+  `claude-desktop-baton status` give each session's resume command
+  (`cd <folder> && claude --resume <id>`).
 - **Usage at a glance.** Each account shows how much of its current session
   (5-hour) and weekly limits is used. A reached limit turns red with the time
   until it resets.

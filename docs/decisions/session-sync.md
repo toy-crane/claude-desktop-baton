@@ -18,8 +18,8 @@
 - The app keeps no state of its own to detect deletions.
 - Remote Control sessions (run by a `claude remote-control` server) are not
   synced and no record is made for them. The app only reads Claude Code's
-  registry of running sessions, says before a switch that they stay with the
-  account that started the server, and hands out each one's resume command.
+  registry of running sessions, asks before a switch, and hands out each
+  one's resume command in the panel and the status command.
 
 ## Boundaries
 

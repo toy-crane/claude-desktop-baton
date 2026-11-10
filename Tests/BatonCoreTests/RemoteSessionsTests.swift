@@ -113,16 +113,16 @@ struct RemoteSessionsTests {
         #expect(SwitchDecision.onSelect(ClaudeFixture.b, current: current, working: 0, remote: 0) == .start)
     }
 
-    @Test func theConfirmationSaysRemoteControlSessionsStayBehindAndOffersTheirResumeCommands() {
+    // User's change: the alert only asks whether to switch; resume commands live in the panel.
+    @Test func theConfirmationOnlyAsksWhetherToSwitch() {
         let alert = Alerts.confirmSwitch(to: "Acme · sam", working: 0, remote: 2)
         let both = Alerts.confirmSwitch(to: "Acme · sam", working: 1, remote: 1)
 
-        #expect(alert.message.hasPrefix("2 Remote Control sessions are running on this Mac."))
-        #expect(alert.message.contains("stay listed under the account that started them, not under Acme · sam"))
-        #expect(alert.message.contains("stop its Remote Control server first"))
-        #expect(alert.buttons == ["Switch", "Cancel", "Copy Commands and Switch"])
+        #expect(alert.title == "Switch to Acme · sam?")
+        #expect(alert.message == "2 Remote Control sessions stay with the current account.")
+        #expect(alert.buttons == ["Switch", "Cancel"])
         #expect(both.message.hasPrefix("1 session is working in Claude."))
-        #expect(both.message.contains("\n\n1 Remote Control session is running on this Mac."))
+        #expect(both.message.hasSuffix("\n\n1 Remote Control session stays with the current account."))
     }
 
     @Test func thePanelCountsRemoteControlSessions() {

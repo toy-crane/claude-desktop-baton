@@ -64,7 +64,6 @@ public struct AlertContent: Equatable, Sendable {
 }
 
 public enum Alerts {
-    /// The third button, offered only with Remote Control sessions, copies their resume commands and switches.
     public static func confirmSwitch(to name: String, working: Int, remote: Int = 0) -> AlertContent {
         var parts: [String] = []
         if working > 0 {
@@ -72,12 +71,10 @@ public enum Alerts {
             parts.append("\(sessions) working in Claude. Switching restarts Claude, which stops them; you can resume them afterwards.")
         }
         if remote > 0 {
-            let sessions = remote == 1 ? "1 Remote Control session is" : "\(remote) Remote Control sessions are"
-            let one = remote == 1 ? "it" : "one"
-            parts.append("\(sessions) running on this Mac. A switch does not stop them, and they stay listed under the account that started them, not under \(name). To continue \(one) in a terminal, stop its Remote Control server first, then run its resume command: two programs writing the same conversation can damage it.")
+            let sessions = remote == 1 ? "1 Remote Control session stays" : "\(remote) Remote Control sessions stay"
+            parts.append("\(sessions) with the current account.")
         }
-        return AlertContent(title: "Switch to \(name)?", message: parts.joined(separator: "\n\n"),
-                            buttons: remote > 0 ? ["Switch", "Cancel", "Copy Commands and Switch"] : ["Switch", "Cancel"])
+        return AlertContent(title: "Switch to \(name)?", message: parts.joined(separator: "\n\n"), buttons: ["Switch", "Cancel"])
     }
 
     public static func switchFailed(to name: String, message: String, putBack: String?) -> AlertContent {
