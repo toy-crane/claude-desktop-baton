@@ -41,7 +41,8 @@ struct PanelStateTests {
         #expect(rows.map(\.name) == ["Acme · alex", "Acme · sam", "Acme · jordan"])
         #expect(rows.map(\.isCurrent) == [true, false, false])
         #expect(rows[0].session == Meter(fraction: 0.62, text: "62%", atLimit: false, reset: "1h"))
-        #expect(rows[0].week == Meter(fraction: 0.81, text: "81%", atLimit: false, reset: "1d"))
+        #expect(rows[0].week == Meter(fraction: 0.81, text: "81%", atLimit: false,
+                                      reset: UsageText.resetLabel(now.addingTimeInterval(86_400), from: now)))
     }
 
     // AC8: a reached limit turns red and shows when it resets.
@@ -62,7 +63,7 @@ struct PanelStateTests {
         let rows = state(usage: entries).rows
 
         #expect(rows[0].session.reset == nil)
-        #expect(rows[0].week.reset == "2d 4h")
+        #expect(rows[0].week.reset == UsageText.resetLabel(now.addingTimeInterval(2 * 86_400 + 4 * 3600), from: now))
         #expect(rows[1].session.reset == nil)
         #expect(rows[1].week.reset == nil)
     }

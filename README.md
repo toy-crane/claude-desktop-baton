@@ -12,7 +12,7 @@ account you switch to, like passing a baton.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/panel-dark.png">
-    <img src="docs/images/panel-light.png" alt="The menu bar panel: the signed-in account on top with its email, and two other accounts below, each with Session and Week usage bars, the percent used, and the time until each limit resets; one account's session limit is reached and shown in red." width="300">
+    <img src="docs/images/panel-light.png" alt="The menu bar panel: the signed-in account on top with its email, and two other accounts below, each with its 5-hour and weekly limits: the percent used, when each resets, and a bar; one account's 5-hour limit is reached and shown in red." width="300">
   </picture>
 </p>
 
@@ -31,9 +31,9 @@ account you switch to, like passing a baton.
   server, not as Code-tab entries. After a switch, the app opens each running
   one in Claude the way Claude Code's `/desktop` does, so it is listed under
   the new account and follows every later switch like any other session.
-- **Usage at a glance.** Each account shows how much of its current session
-  (5-hour) and weekly limits is used, and how long until each one resets. A
-  reached limit turns red.
+- **Usage at a glance.** Each account shows how much of its 5-hour and weekly
+  limits is used, with a bar, and when each one resets (`↻ 1h 12m`, or the
+  weekday and time for a reset days away). A reached limit turns red.
 - **Asks before stopping work.** If a Code session was active in the last two
   minutes, switching asks first, because restarting Claude stops running work.
   If a switch fails, you can put the previous account back in one click.
