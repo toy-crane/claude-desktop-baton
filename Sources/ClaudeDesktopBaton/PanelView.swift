@@ -258,13 +258,17 @@ struct AccountBlock: View {
             HStack(spacing: 8) {
                 Text(label).font(.system(size: 12.5)).lineLimit(1)
                 Spacer(minLength: 6)
-                if let reset = meter.reset {
-                    Text("↻ \(reset)").font(.system(size: 11.5)).monospacedDigit().foregroundStyle(p.muted).lineLimit(1)
+                // The reset sits close to the percent; the percent has just the width "100%" needs, so every
+                // reset ends at the same place without a wide gap after a short percent.
+                HStack(spacing: 4) {
+                    if let reset = meter.reset {
+                        Text("↻ \(reset)").font(.system(size: 11.5)).monospacedDigit().foregroundStyle(p.muted).lineLimit(1)
+                    }
+                    Text(meter.text).font(.system(size: 12.5)).monospacedDigit()
+                        .foregroundStyle(meter.atLimit ? p.danger : p.ink)
+                        .lineLimit(1)
+                        .frame(width: 36, alignment: .trailing)
                 }
-                // A fixed width, so every percent ends at the same place whatever the reset text is.
-                Text(meter.text).font(.system(size: 12.5)).monospacedDigit()
-                    .foregroundStyle(meter.atLimit ? p.danger : p.ink)
-                    .frame(width: 38, alignment: .trailing)
             }
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
