@@ -26,6 +26,8 @@ struct PanelActions {
     var setLaunchAtLogin: (Bool) -> Void = { _ in }
     var installCommandLine: () -> Void = {}
     var checkForUpdates: () -> Void = {}
+    /// Copies one Remote Control session's resume command, or all of them when nil.
+    var copyResumeCommand: (String?) -> Void = { _ in }
     var about: () -> Void = {}
     var quit: () -> Void = {}
 }
@@ -65,6 +67,10 @@ struct PanelView: View {
             }
             .padding(.horizontal, 6)
             .padding(.bottom, 6)
+            if let note = state.remoteNote {
+                Rectangle().fill(p.border).frame(height: 1)
+                remoteRow(note, p)
+            }
             if let update {
                 Rectangle().fill(p.border).frame(height: 1)
                 updateRow(update, p)
@@ -91,6 +97,35 @@ struct PanelView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+    }
+
+    /// Remote Control sessions stay with the account that started them; this row hands out their resume commands.
+    private func remoteRow(_ note: String, _ p: Palette) -> some View {
+        HStack(spacing: 8) {
+            Text(note).font(.system(size: 12.5)).lineLimit(1)
+            Spacer(minLength: 6)
+            if forSnapshot {
+                Text("Resume…").font(.system(size: 12)).foregroundStyle(p.muted)
+            } else {
+                Menu("Resume…") {
+                    Text("Not carried over by a switch. Copy a resume command:")
+                    ForEach(state.remote) { session in
+                        Button(session.openElsewhere ? "\(session.title) (also open elsewhere)" : session.title) {
+                            actions.copyResumeCommand(session.sessionId)
+                        }
+                    }
+                    Divider()
+                    Button("Copy All Resume Commands") { actions.copyResumeCommand(nil) }
+                    Text("Stop a session's Remote Control server before resuming it.")
+                }
+                .font(.system(size: 12))
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .help("These sessions run under a Remote Control server and stay listed under the account that started it.")
     }
 
     private func footer(_ p: Palette) -> some View {

@@ -26,6 +26,12 @@ account you switch to, like passing a baton.
   session entries between accounts: every active session, and archived ones
   active in the last 30 days. Sessions you delete in Claude are removed from the
   other accounts too. Nothing is touched while you are not switching.
+- **Says what a switch leaves behind.** Sessions run by a Remote Control server
+  (`claude remote-control`) are not Code-tab entries, so no switch carries them:
+  they keep running and stay listed under the account that started the server.
+  The switch asks first and can copy each session's resume command
+  (`cd <folder> && claude --resume <id>`); the panel's **Resume…** menu and
+  `claude-desktop-baton status` list them too.
 - **Usage at a glance.** Each account shows how much of its current session
   (5-hour) and weekly limits is used. A reached limit turns red with the time
   until it resets.
@@ -110,6 +116,7 @@ app in Applications.
 | `~/Library/Application Support/Claude/claude-code-sessions/` | Session entries copied or moved to the app's trash during a switch, with Claude closed |
 | `~/Library/Logs/Claude/main.log` | Read to tell which account Claude has loaded |
 | `~/.claude/projects/` | File times read to tell which sessions are working |
+| `~/.claude/sessions/` | Read to find the Remote Control sessions running on this Mac; never changed |
 | Keychain item "Claude Safe Storage" | Read to decrypt session cookies in memory for usage requests |
 | `https://claude.ai/api/organizations/<org>/usage`, `/api/account` | Usage and account names |
 | Keychain item "Claude Code-credentials" (the CLI's login) | Its `claudeAiOauth` entry read to save each account's CLI sign-in, and replaced during a switch under Claude Code's own locks; its MCP tokens are left as they are |
@@ -132,6 +139,10 @@ by a sync go to the app's own trash, not the system's.
 - Cowork sessions, cloud sessions, artifacts and scheduled tasks stay with the
   account that created them. A session's Remote Control setting travels with
   it, but its remote connection may need to be re-established.
+- Remote Control sessions started by `claude remote-control` are not moved to
+  the new account. Resume one with the command the app gives you, after
+  stopping its Remote Control server: two programs writing the same
+  conversation can damage it.
 - A newly added account lists the other accounts' sessions from its next
   switch-in on.
 - The CLI moves only to accounts whose CLI sign-in is saved; otherwise it stays

@@ -29,7 +29,8 @@ final class ClaudeFixture {
         root = FileManager.default.temporaryDirectory.appendingPathComponent("baton-claude-\(UUID().uuidString)")
         let data = root.appendingPathComponent("Claude")
         claude = ClaudePaths(dataDir: data, log: root.appendingPathComponent("Logs/main.log"),
-                             projects: root.appendingPathComponent("claude-projects"))
+                             projects: root.appendingPathComponent("claude-projects"),
+                             cliSessions: root.appendingPathComponent("claude-sessions"))
         app = AppPaths(root: root.appendingPathComponent("Baton"))
         store = AccountStore(paths: app)
         fake = FakeClaude(claude: claude)

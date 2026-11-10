@@ -19,7 +19,7 @@ struct BatonApp: App {
                       actions: PanelActions(
                 select: model.select, addAccount: model.addAccount, requestRemove: model.requestRemove,
                 setLaunchAtLogin: model.setLaunchAtLogin, installCommandLine: model.installCommandLine,
-                checkForUpdates: model.checkForUpdates,
+                checkForUpdates: model.checkForUpdates, copyResumeCommand: model.copyResumeCommand,
                 about: model.showAbout, quit: model.quit))
             .onAppear { model.panelOpened() }
         } label: {

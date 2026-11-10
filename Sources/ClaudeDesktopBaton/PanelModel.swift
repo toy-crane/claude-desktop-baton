@@ -24,6 +24,8 @@ final class PanelModel {
     private(set) var commandLineInstalled = false
     private(set) var cliState: CLIState?
     private(set) var cliSaved: Set<String> = []
+    /// Remote Control sessions running on this Mac, read when the panel opens and before a switch.
+    private(set) var remote: [RemoteSession] = []
     private(set) var now = Date()
     private var addingSince: Date?
     /// Claude's log size when it reopened signed out; any account loading after it ends adding.
@@ -35,7 +37,8 @@ final class PanelModel {
     @ObservationIgnored private var alertsOpen = 0
 
     var state: PanelState {
-        PanelState.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now, cli: cliState, cliSaved: cliSaved)
+        PanelState.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now, cli: cliState, cliSaved: cliSaved,
+                        remote: remote)
     }
     /// A switch, an account add, or an update about to quit the app: no new switch may start.
     var isBusy: Bool { state.busy || updater.isInstalling }
@@ -98,6 +101,7 @@ final class PanelModel {
         updater.panelOpened()
         launchAtLogin = SMAppService.mainApp.status == .enabled
         commandLineInstalled = CommandLineTool.state == .installed
+        remote = RemoteSessions.running(registry: claude.cliSessions)
         refreshCLI()
         refreshUsage(panelOpening: true)
     }
@@ -149,13 +153,28 @@ final class PanelModel {
 
     func select(_ id: String) {
         guard !isBusy else { return }
-        let decision = SwitchDecision.onSelect(id, current: current, working: switcher.workingSessions())
+        remote = RemoteSessions.running(registry: claude.cliSessions)
+        let decision = SwitchDecision.onSelect(id, current: current, working: switcher.workingSessions(), remote: remote.count)
         guard decision != .none else { return }
         closePanel()
-        if case .confirm(let working) = decision {
-            guard show(Alerts.confirmSwitch(to: name(id), working: working)) == 0 else { return }
+        if case .confirm(let working, let remoteCount) = decision {
+            let choice = show(Alerts.confirmSwitch(to: name(id), working: working, remote: remoteCount))
+            guard choice == 0 || (choice == 2 && remoteCount > 0) else { return }
+            if choice == 2 { copy(RemoteSessions.resumeCommands(remote)) }
         }
         startSwitch(to: id)
+    }
+
+    /// Puts resume commands on the clipboard: one session's, or every Remote Control session's when nil.
+    func copyResumeCommand(_ sessionId: String?) {
+        let sessions = sessionId.map { id in remote.filter { $0.sessionId == id } } ?? remote
+        guard !sessions.isEmpty else { return }
+        copy(RemoteSessions.resumeCommands(sessions))
+    }
+
+    private func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     /// A switch asked for on the command line: refused where the panel would ask, otherwise run as a click.

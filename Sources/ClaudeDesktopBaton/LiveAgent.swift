@@ -23,7 +23,8 @@ enum LiveAgent {
                 return StatusFacts(claudeRunning: LiveClaude().isRunning,
                                    menuBarAppRunning: ControlClient.isListening(paths.controlSocket),
                                    workingSessions: switcher.workingSessions(), legacyImportable: legacy,
-                                   syncPreview: preview.summary + notes)
+                                   syncPreview: preview.summary + notes,
+                                   remoteSessions: RemoteSessions.running(registry: claude.cliSessions))
             },
             requestSwitch: { request, wait in await requestSwitch(request, wait: wait, socket: paths.controlSocket) },
             cli: CLIAccounts(paths: .live, credentials: SecurityCLICredentials(), saved: KeychainSecrets(), store: store))

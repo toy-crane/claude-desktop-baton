@@ -16,6 +16,10 @@
   age. A record that vanished without a marker is not a deletion; it is filled
   back from another folder's copy.
 - The app keeps no state of its own to detect deletions.
+- Remote Control sessions (run by a `claude remote-control` server) are not
+  synced and no record is made for them. The app only reads Claude Code's
+  registry of running sessions, says before a switch that they stay with the
+  account that started the server, and hands out each one's resume command.
 
 ## Boundaries
 
@@ -53,9 +57,17 @@ failure is a session that reappears, never one that is lost.
 - A session deleted in Claude reappears after a switch (Claude no longer
   writes a `deleted_` marker for some deletions), or the marker's format
   changes.
+- Claude Desktop documents its session record format, or a Remote Control
+  server's sessions start following the CLI's account on their own.
 
 ## Still-rejected alternatives
 
+- Writing a `local_<uuid>.json` record for each Remote Control session so it
+  shows in the Code tab of the new account — the format is undocumented, the
+  records Claude writes when it takes over a CLI session carry values only the
+  running app has, a made-up record could only be checked by writing into the
+  real folders, and opening it would put a second writer on a conversation the
+  server still holds; revisit when the format is documented.
 - Background sync on file changes and a fixed interval (the reference
   project's approach) — writes into the loaded folder race with Claude's
   in-memory copy and require protect-and-defer rules; revisit only if Claude
@@ -68,6 +80,17 @@ failure is a session that reappears, never one that is lost.
   if Claude stops writing `deleted_` markers.
 
 ## Evidence worth preserving
+
+- On 2026-11-10, after a switch, four sessions run by `claude remote-control`
+  servers (worktrees `<repo>/.claude/worktrees/bridge-cse_<id>`) were missing
+  from the new account while every Code-tab record was in sync. None of the
+  2,135 records had such a worktree as its `cwd`. The 34 records marked
+  `adoptedFromOtherSurface` all had `sessionId` equal to `local_` plus the
+  `cliSessionId`, and each carried a `remoteMcpServersConfig` of 10–90 KB and
+  other snapshots written by the running app.
+- The same day, each of those four sessions was open in two processes at once
+  (the server's child and a resumed copy), found through
+  `~/.claude/sessions/<pid>.json` entries sharing one `sessionId`.
 
 - On this Mac, the reference project's background sync logged 265–408 passes
   with changes per day (2026-11-02 to 2026-11-04), each rewriting 12–24
