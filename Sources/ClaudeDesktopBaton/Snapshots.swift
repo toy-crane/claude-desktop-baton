@@ -26,6 +26,12 @@ func renderSnapshots(to folder: URL) {
     cases.append(("switching", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .switching(accountId: b), now: now)))
     cases.append(("cli", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now,
                                          cli: .account(Identity(account: b, org: org)), cliSaved: [a, b])))
+    var withModels = usage
+    withModels[a] = UsageEntry(usage: Usage(session: .init(used: 62, resetsAt: now.addingTimeInterval(3600)),
+                                            week: .init(used: 81, resetsAt: now.addingTimeInterval(2 * 86_400 + 4 * 3600)),
+                                            models: [.init(name: "Fable", bucket: .init(used: 24, resetsAt: now.addingTimeInterval(2 * 86_400 + 4 * 3600)), allowancePercent: 50)]),
+                               checked: now.addingTimeInterval(-60))
+    cases.append(("model-limit", PanelState.make(accounts: accounts, current: current, usage: withModels, phase: .idle, now: now)))
     usage[b] = UsageEntry(failure: .offline, lastAttempt: now)
     cases.append(("usage-error", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now)))
 
