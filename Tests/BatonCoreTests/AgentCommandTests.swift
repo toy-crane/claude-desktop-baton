@@ -81,17 +81,17 @@ struct AgentCommandTests {
 
     // MARK: accounts
 
-    // AC1: every saved account in the panel's order, the signed-in one marked.
-    @Test func accountsListsEverySavedAccountInPanelOrderAndMarksTheSignedInOne() async throws {
+    // AC11 (switch-to-order): every saved account in name order, the signed-in one marked.
+    @Test func accountsListsEverySavedAccountInNameOrderAndMarksTheSignedInOne() async throws {
         let f = try threeAccounts()
 
         let out = await AgentCommand.run(["accounts", "--json"], context(f, AppStandIn()))
 
         let rows = json(out.text)["accounts"] as? [[String: Any]] ?? []
         #expect(out.code == 0)
-        #expect(rows.map { $0["accountId"] as? String } == [C, B, A])
-        #expect(rows.map { $0["signedIn"] as? Bool } == [false, false, true])
-        #expect(rows.map { $0["email"] as? String } == ["carol@example.com", "bob@example.com", "alice@example.com"])
+        #expect(rows.map { $0["accountId"] as? String } == [A, B, C])
+        #expect(rows.map { $0["signedIn"] as? Bool } == [true, false, false])
+        #expect(rows.map { $0["email"] as? String } == ["alice@example.com", "bob@example.com", "carol@example.com"])
     }
 
     // MARK: choosing an account

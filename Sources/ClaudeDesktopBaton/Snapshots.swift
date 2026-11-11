@@ -35,6 +35,18 @@ func renderSnapshots(to folder: URL) {
     usage[b] = UsageEntry(failure: .offline, lastAttempt: now)
     cases.append(("usage-error", PanelState.make(accounts: accounts, current: current, usage: usage, phase: .idle, now: now)))
 
+    // Accounts out of Week sit in a bottom group; a long name truncates; the target shows the spinner.
+    var weekOut = usage
+    weekOut[b] = UsageEntry(usage: Usage(session: .init(used: 8, resetsAt: now.addingTimeInterval(4 * 3600)), week: .init(used: 100, resetsAt: now.addingTimeInterval(2 * 86_400 + 3 * 3600))), checked: now.addingTimeInterval(-60))
+    var weekAccounts = accounts
+    let d = "dddddddd-0000-4000-8000-000000000004"
+    weekAccounts.append(SavedAccount(accountId: d, orgId: org, email: "x@example.com", orgName: "A very long organization name that cannot fit", savedAt: 4, addedAt: 4,
+                                     signIn: SignIn(config: [:], cookieSchema: 24, cookies: [])))
+    weekOut[d] = UsageEntry(usage: Usage(session: .init(used: 8, resetsAt: nil), week: .init(used: 100, resetsAt: now.addingTimeInterval(86_400 + 3600))), checked: now.addingTimeInterval(-60))
+    cases.append(("week-limit-reached", PanelState.make(accounts: weekAccounts, current: current, usage: weekOut, phase: .idle, now: now,
+                                                        cli: .account(Identity(account: b, org: org)), cliSaved: [a, b])))
+    cases.append(("week-limit-switching", PanelState.make(accounts: weekAccounts, current: current, usage: weekOut, phase: .switching(accountId: b), now: now)))
+
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
     // The menu bar item on a light and a dark bar, at 4x: the baton, and the usage meter in its states.

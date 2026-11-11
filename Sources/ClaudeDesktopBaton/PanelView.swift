@@ -70,6 +70,16 @@ struct PanelView: View {
             }
             .padding(.horizontal, PanelSpacing.edge)
             .padding(.bottom, PanelSpacing.edge)
+            if !state.weekLimitReached.isEmpty {
+                SectionLabel(text: "Week limit reached", palette: p)
+                VStack(spacing: 0) {
+                    ForEach(state.weekLimitReached) { row in
+                        WeekLimitRow(row: row, actions: actions, highlighted: $highlighted)
+                    }
+                }
+                .padding(.horizontal, PanelSpacing.edge)
+                .padding(.bottom, PanelSpacing.edge)
+            }
             if let update {
                 Rectangle().fill(p.border).frame(height: 1)
                 updateRow(update, p)
@@ -313,6 +323,48 @@ struct AccountBlock: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// An account whose Week limit is used up: one line with its name and when the limit resets.
+/// Still switchable, with the same hover, confirmation, and switching look as a full block.
+struct WeekLimitRow: View {
+    let row: AccountRow
+    let actions: PanelActions
+    var highlighted: Binding<String?> = .constant(nil)
+    @Environment(\.colorScheme) private var scheme
+
+    private var canSwitch: Bool { !row.isDisabled && !row.isCurrent }
+
+    var body: some View {
+        let p = Palette(scheme)
+        HStack(spacing: 8) {
+            if row.isTarget { Spinner(color: p.ink).frame(width: 9, height: 9).padding(.horizontal, -1.5) }
+            Text(row.name).font(.system(size: 13, weight: .regular)).foregroundStyle(p.ink.opacity(0.85))
+                .lineLimit(1).truncationMode(.tail)
+            if row.isCLI {
+                Text("CLI").font(.system(size: 9.5, weight: .semibold, design: .monospaced)).foregroundStyle(p.muted)
+                    .padding(.horizontal, 4).padding(.vertical, 1)
+                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(p.muted.opacity(0.6), lineWidth: 0.75))
+                    .help("The Claude Code CLI is signed in to this account.")
+                    .layoutPriority(1)
+            }
+            Spacer(minLength: 6)
+            if let reset = row.week.reset {
+                Text("\u{21BB} \(reset)").font(.system(size: 11.5)).monospacedDigit().foregroundStyle(p.muted)
+                    .lineLimit(1).fixedSize().layoutPriority(2)
+            }
+        }
+        .padding(.horizontal, PanelSpacing.inset).padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 8).fill(highlighted.wrappedValue == row.id ? p.hover : .clear))
+        .contentShape(Rectangle())
+        .onHover { inside in
+            if inside && canSwitch { highlighted.wrappedValue = row.id }
+            else if highlighted.wrappedValue == row.id { highlighted.wrappedValue = nil }
+        }
+        .onTapGesture { if canSwitch { actions.select(row.id) } }
+        .help(row.tooltip)
+        .opacity(row.isDisabled && !row.isTarget ? 0.4 : 1)
     }
 }
 

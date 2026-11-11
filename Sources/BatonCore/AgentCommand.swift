@@ -206,7 +206,7 @@ public enum AgentCommand {
     // MARK: commands
 
     static func accounts(_ context: AgentContext, _ options: Options) -> AgentOutput {
-        let accounts = context.store.all()
+        let accounts = sortedByName(context.store.all())
         let names = displayNames(accounts)
         let current = ClaudeLog.current(context.claude.log)?.account
         let cli = context.cli?.current().identity
