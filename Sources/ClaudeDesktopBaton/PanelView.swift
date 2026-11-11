@@ -234,6 +234,9 @@ struct AccountBlock: View {
             }
             limit("5-hour limit", row.session, p).padding(.top, PanelSpacing.gap)
             limit("Weekly", row.week, p).padding(.top, PanelSpacing.gap)
+            ForEach(Array(row.models.enumerated()), id: \.offset) { _, model in
+                limit(model.name, model.meter, p).padding(.top, PanelSpacing.gap)
+            }
         }
         .padding(PanelSpacing.inset)
         .background(RoundedRectangle(cornerRadius: 8).fill(hovering && !row.isCurrent && !row.isDisabled ? p.hover : .clear))

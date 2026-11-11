@@ -45,6 +45,44 @@ struct PanelStateTests {
                                       reset: UsageText.resetLabel(now.addingTimeInterval(86_400), from: now)))
     }
 
+    func modelEntry(failure: UsageFailure? = nil) -> [String: UsageEntry] {
+        let reset = now.addingTimeInterval(86_400)
+        let limits = [Usage.ModelLimit(name: "Fable", bucket: .init(used: 24, resetsAt: reset), allowancePercent: 50),
+                      Usage.ModelLimit(name: "Orion", bucket: .init(used: 100, resetsAt: reset))]
+        var entries = usage
+        entries[ClaudeFixture.a] = UsageEntry(usage: Usage(session: .init(used: 62, resetsAt: nil), week: .init(used: 81, resetsAt: nil),
+                                                           models: limits), failure: failure, checked: now)
+        return entries
+    }
+
+    // Model weekly limits: a meter per limit under Week, red only when reached; accounts without one are unchanged.
+    @Test func modelLimitsShowAsMetersAfterWeek() {
+        let rows = state(usage: modelEntry()).rows
+
+        #expect(rows[0].models.map(\.name) == ["Fable", "Orion"])
+        #expect(rows[0].models[0].meter.fraction == 0.24 && rows[0].models[0].meter.text == "24%")
+        #expect(!rows[0].models[0].meter.atLimit && rows[0].models[1].meter.atLimit)
+        #expect(rows[1].models.isEmpty && rows[2].models.isEmpty)
+        #expect(rows[1] == state().rows[1])
+    }
+
+    // Hover adds each model limit's reset and allowance; without an allowance only the reset.
+    @Test func hoverShowsModelLimitResetAndAllowance() {
+        let tooltip = state(usage: modelEntry()).rows[0].tooltip
+        let reset = Date(timeIntervalSince1970: 1_793_000_000 + 86_400).formatted(date: .abbreviated, time: .shortened)
+
+        #expect(tooltip.contains("Fable resets \(reset) · up to 50% of Week"))
+        #expect(tooltip.contains("Orion resets \(reset)\n") || tooltip.hasSuffix("Orion resets \(reset)"))
+    }
+
+    // A failed refresh keeps a model meter the account had, reading "—" with an empty bar.
+    @Test func failedRefreshBlanksModelMeters() {
+        let meter = state(usage: modelEntry(failure: .offline)).rows[0].models[0]
+
+        #expect(meter.name == "Fable")
+        #expect(meter.meter == Meter(fraction: 0, text: "—", atLimit: false))
+    }
+
     // AC8: a reached limit turns red and shows when it resets.
     @Test func reachedLimitIsMarkedWithTheTimeUntilItResets() {
         let row = state().rows[2]

@@ -64,6 +64,57 @@ struct UsageTests {
         #expect(usage.session?.resetsAt == Date(timeIntervalSince1970: 1_793_860_800))
     }
 
+    static let modelResponse = #"""
+    {"five_hour":{"utilization":10,"resets_at":"2026-11-05T06:40:00+00:00"},
+     "seven_day":{"utilization":48,"resets_at":"2026-11-09T00:00:00+00:00"},
+     "limits":[
+       {"kind":"session","percent":10,"resets_at":"2026-11-05T06:40:00+00:00"},
+       {"kind":"weekly_all","percent":48,"resets_at":"2026-11-09T00:00:00+00:00"},
+       {"kind":"weekly_scoped","scope":{"model":{"display_name":"Fable"}},"percent":24,"resets_at":"2026-11-09T00:00:00+00:00"},
+       {"kind":"weekly_scoped","scope":{"model":{"display_name":"Orion"}},"percent":100,"resets_at":"2026-11-09T00:00:00+00:00"},
+       {"kind":"weekly_scoped","scope":{},"percent":5,"resets_at":"2026-11-09T00:00:00+00:00"}],
+     "weekly_scoped_shares":[{"limit_index":2,"allowance_percent_of_weekly":50}]}
+    """#
+
+    // Model weekly limits: named scoped limits in response order, with their allowance when reported.
+    @Test func readsModelWeeklyLimitsInResponseOrder() throws {
+        let usage = try Usage(json: Data(Self.modelResponse.utf8))
+
+        #expect(usage.models.map(\.name) == ["Fable", "Orion"])
+        #expect(usage.models[0].bucket.used == 24)
+        #expect(usage.models[0].bucket.resetsAt == Date(timeIntervalSince1970: 1_794_182_400))
+        #expect(usage.models[0].allowancePercent == 50)
+        #expect(usage.models[1].allowancePercent == nil)
+        #expect(usage.session?.used == 10 && usage.week?.used == 48)
+    }
+
+    // An absurd allowance is clamped so it can never overflow when written as a percent.
+    @Test func allowanceIsClamped() throws {
+        let json = #"{"limits":[{"kind":"weekly_scoped","scope":{"model":{"display_name":"X"}},"percent":1}],"weekly_scoped_shares":[{"limit_index":0,"allowance_percent_of_weekly":1e300}]}"#
+        #expect(try Usage(json: Data(json.utf8)).models.first?.allowancePercent == 100)
+    }
+
+    // A missing or malformed `limits` leaves Session and Week intact.
+    @Test(arguments: [#"{"five_hour":{"utilization":1},"seven_day":{"utilization":2}}"#,
+                      #"{"five_hour":{"utilization":1},"seven_day":{"utilization":2},"limits":"x"}"#,
+                      #"{"five_hour":{"utilization":1},"seven_day":{"utilization":2},"limits":[1,null,{"kind":"weekly_scoped","scope":7,"percent":"a"}]}"#])
+    func malformedLimitsLeaveSessionAndWeek(json: String) throws {
+        let usage = try Usage(json: Data(json.utf8))
+        #expect(usage.models.isEmpty)
+        #expect(usage.session?.used == 1 && usage.week?.used == 2)
+    }
+
+    // Saved usage keeps model limits, and a cache file from before them still decodes.
+    @Test func savedUsageCarriesModelLimitsAndOldFilesDecode() throws {
+        let usage = try Usage(json: Data(Self.modelResponse.utf8))
+        let back = try JSONDecoder().decode(Usage.self, from: JSONEncoder().encode(usage))
+        #expect(back == usage)
+
+        let old = Data(#"{"session":{"used":3},"week":{"used":4}}"#.utf8)
+        let decoded = try JSONDecoder().decode(Usage.self, from: old)
+        #expect(decoded.models.isEmpty && decoded.week?.used == 4)
+    }
+
     // AC8: a reached limit shows how long until it resets.
     @Test func resetCountdownReadsInHoursAndMinutes() {
         let now = Date(timeIntervalSince1970: 1_000_000)
