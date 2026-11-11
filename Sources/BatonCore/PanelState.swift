@@ -29,6 +29,12 @@ public struct Meter: Equatable, Sendable {
     }
 }
 
+/// The meter of one model weekly limit, labeled with the model's name.
+public struct ModelMeter: Equatable, Sendable {
+    public let name: String
+    public let meter: Meter
+}
+
 public struct AccountRow: Equatable, Sendable, Identifiable {
     public let id: String
     public let name: String
@@ -37,6 +43,8 @@ public struct AccountRow: Equatable, Sendable, Identifiable {
     public let isDisabled: Bool
     public let session: Meter
     public let week: Meter
+    /// One meter per model weekly limit, shown under Week; empty for most accounts.
+    public var models: [ModelMeter] = []
     /// Why usage is unavailable, shown on hover beside the name.
     public let failureReason: String?
     public let tooltip: String
@@ -170,11 +178,20 @@ public struct PanelState: Equatable, Sendable {
             if cli != nil, !cliSaved.contains(account.accountId) { tooltip.append("CLI not signed in yet") }
             if let shown {
                 tooltip.append("Session resets \(when(shown.session?.resetsAt)) · Week resets \(when(shown.week?.resetsAt))")
+                for limit in shown.models {
+                    var line = "\(limit.name) resets \(when(limit.bucket.resetsAt))"
+                    if let allowance = limit.allowancePercent { line += " · up to \(Int(allowance.rounded()))% of Week" }
+                    tooltip.append(line)
+                }
+            }
+            // A failed refresh keeps the model meters the account had, reading "—".
+            let models = (entry?.usage?.models ?? []).map {
+                ModelMeter(name: $0.name, meter: meter(shown == nil ? nil : $0.bucket, weekly: true))
             }
             return AccountRow(id: account.accountId, name: names[account.accountId] ?? "Account \(account.accountId.prefix(8))",
                               isCurrent: account.accountId == current?.account,
                               isTarget: account.accountId == target, isDisabled: busy,
-                              session: meter(shown?.session), week: meter(shown?.week, weekly: true),
+                              session: meter(shown?.session), week: meter(shown?.week, weekly: true), models: models,
                               failureReason: entry?.failure?.reason,
                               tooltip: tooltip.joined(separator: "\n"), email: account.email,
                               isCLI: cli?.identity.map { $0.account == account.accountId && $0.org == account.orgId } ?? false)

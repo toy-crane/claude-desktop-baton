@@ -13,8 +13,31 @@ public struct Usage: Equatable, Sendable, Codable {
     /// The current-session (5-hour) limit.
     public let session: Bucket?
     public let week: Bucket?
+    /// Weekly limits that apply to one model, in the order claude.ai lists them; empty when the plan has none.
+    public let models: [ModelLimit]
 
-    public init(session: Bucket?, week: Bucket?) { self.session = session; self.week = week }
+    /// A weekly limit for one model, such as "Fable".
+    public struct ModelLimit: Equatable, Sendable, Codable {
+        public let name: String
+        public let bucket: Bucket
+        /// The share of the weekly limit this model may use, in percent ("up to 50%"); nil when not reported.
+        public let allowancePercent: Double?
+        public init(name: String, bucket: Bucket, allowancePercent: Double? = nil) {
+            self.name = name; self.bucket = bucket; self.allowancePercent = allowancePercent
+        }
+    }
+
+    public init(session: Bucket?, week: Bucket?, models: [ModelLimit] = []) {
+        self.session = session; self.week = week; self.models = models
+    }
+
+    // Saved usage from before model limits existed has no `models`; it decodes as none.
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        session = try values.decodeIfPresent(Bucket.self, forKey: .session)
+        week = try values.decodeIfPresent(Bucket.self, forKey: .week)
+        models = try values.decodeIfPresent([ModelLimit].self, forKey: .models) ?? []
+    }
 
     public init(json: Data) throws {
         guard let body = (try? JSONSerialization.jsonObject(with: json)) as? [String: Any] else {
@@ -22,6 +45,26 @@ public struct Usage: Equatable, Sendable, Codable {
         }
         session = Self.bucket(body["five_hour"])
         week = Self.bucket(body["seven_day"])
+        models = Self.modelLimits(body)
+    }
+
+    /// `weekly_scoped` entries of `limits` that name a model. Anything unexpected here yields fewer or no
+    /// model limits and never affects Session or Week.
+    static func modelLimits(_ body: [String: Any]) -> [ModelLimit] {
+        guard let limits = body["limits"] as? [Any] else { return [] }
+        let shares = body["weekly_scoped_shares"] as? [Any] ?? []
+        return limits.enumerated().compactMap { index, value in
+            guard let limit = value as? [String: Any], limit["kind"] as? String == "weekly_scoped",
+                  let scope = limit["scope"] as? [String: Any], let model = scope["model"] as? [String: Any],
+                  let name = (model["display_name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty,
+                  let bucket = bucket(["utilization": limit["percent"] as Any, "resets_at": limit["resets_at"] as Any])
+            else { return nil }
+            let allowance = shares.lazy.compactMap { $0 as? [String: Any] }
+                .first { ($0["limit_index"] as? NSNumber)?.intValue == index }
+                .flatMap { $0["allowance_percent_of_weekly"] as? NSNumber }
+                .flatMap { CFGetTypeID($0) != CFBooleanGetTypeID() && $0.doubleValue.isFinite ? $0.doubleValue : nil }
+            return ModelLimit(name: name, bucket: bucket, allowancePercent: allowance)
+        }
     }
 
     static func bucket(_ value: Any?) -> Bucket? {
