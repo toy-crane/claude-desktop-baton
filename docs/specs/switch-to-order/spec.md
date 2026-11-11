@@ -65,6 +65,8 @@ Out:
      other models can still be used.
    - An account whose usage could not be fetched, or has never been fetched,
      stays in the main list with "—" as today.
+   - An account at Week 100% whose Week reset time is unknown stays in the
+     main list, since there is no reset to show on its one-line row.
    - Once the Week reset time passes, the account returns to the main list
      right away, even before the next refresh confirms it.
 3. **Main list** — the accounts that are not out of Week, in name order, as
