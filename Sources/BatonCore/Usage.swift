@@ -62,7 +62,7 @@ public struct Usage: Equatable, Sendable, Codable {
             let allowance = shares.lazy.compactMap { $0 as? [String: Any] }
                 .first { ($0["limit_index"] as? NSNumber)?.intValue == index }
                 .flatMap { $0["allowance_percent_of_weekly"] as? NSNumber }
-                .flatMap { CFGetTypeID($0) != CFBooleanGetTypeID() && $0.doubleValue.isFinite ? $0.doubleValue : nil }
+                .flatMap { CFGetTypeID($0) != CFBooleanGetTypeID() && $0.doubleValue.isFinite ? min(100, max(0, $0.doubleValue)) : nil }
             return ModelLimit(name: name, bucket: bucket, allowancePercent: allowance)
         }
     }

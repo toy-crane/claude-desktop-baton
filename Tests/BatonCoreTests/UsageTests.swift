@@ -88,6 +88,12 @@ struct UsageTests {
         #expect(usage.session?.used == 10 && usage.week?.used == 48)
     }
 
+    // An absurd allowance is clamped so it can never overflow when written as a percent.
+    @Test func allowanceIsClamped() throws {
+        let json = #"{"limits":[{"kind":"weekly_scoped","scope":{"model":{"display_name":"X"}},"percent":1}],"weekly_scoped_shares":[{"limit_index":0,"allowance_percent_of_weekly":1e300}]}"#
+        #expect(try Usage(json: Data(json.utf8)).models.first?.allowancePercent == 100)
+    }
+
     // A missing or malformed `limits` leaves Session and Week intact.
     @Test(arguments: [#"{"five_hour":{"utilization":1},"seven_day":{"utilization":2}}"#,
                       #"{"five_hour":{"utilization":1},"seven_day":{"utilization":2},"limits":"x"}"#,
