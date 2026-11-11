@@ -18,7 +18,7 @@ final class PanelModel {
     private(set) var accounts: [SavedAccount] = []
     private(set) var current: Identity?
     private(set) var usage: [String: UsageEntry] = [:]
-    private(set) var phase: Phase = .idle
+    private(set) var phase: Phase = .idle { didSet { syncSpinner() } }
     private(set) var step: SwitchStep?
     private(set) var launchAtLogin = false
     private(set) var commandLineInstalled = false
@@ -27,7 +27,10 @@ final class PanelModel {
     private(set) var now = Date()
     /// What the menu bar item shows and how, chosen in the "⋯" menu and kept across launches.
     private(set) var menuBarStyle = MenuBarStyle.load()
-    private var addingSince: Date?
+    private var addingSince: Date? { didSet { syncSpinner() } }
+    /// Which frame of the turning icon the menu bar shows; moves only while `menuBar` is `.switching`.
+    private(set) var spinnerFrame = 0
+    @ObservationIgnored private var spinnerTimer: Timer?
     /// Claude's log size when it reopened signed out; any account loading after it ends adding.
     @ObservationIgnored private var addingLogOffset: UInt64?
     @ObservationIgnored private var timer: Timer?
@@ -44,6 +47,23 @@ final class PanelModel {
     var menuBar: MenuBarLabel {
         MenuBarLabel.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now,
                           content: menuBarStyle.content, waitingForSignIn: addingSince != nil)
+    }
+
+    /// Runs the spinner's timer only while the item is turning, so an idle app never redraws it.
+    private func syncSpinner() {
+        if menuBar == .switching {
+            guard spinnerTimer == nil else { return }
+            spinnerFrame = 0
+            let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.spinnerFrame = ((self?.spinnerFrame ?? 0) + 1) % AppIcon.spinnerFrameCount }
+            }
+            // Common modes keep it turning while an alert's modal loop runs.
+            RunLoop.main.add(timer, forMode: .common)
+            spinnerTimer = timer
+        } else {
+            spinnerTimer?.invalidate()
+            spinnerTimer = nil
+        }
     }
 
     func setMenuBarStyle(_ style: MenuBarStyle) {
