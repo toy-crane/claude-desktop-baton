@@ -38,7 +38,7 @@ struct PanelStateTests {
     @Test func eachAccountShowsSessionAndWeekPercentWithTheCurrentOneMarked() {
         let rows = state().rows
 
-        #expect(rows.map(\.name) == ["Acme · alex", "Acme · sam", "Acme · jordan"])
+        #expect(rows.map(\.name) == ["Acme · alex", "Acme · jordan", "Acme · sam"])
         #expect(rows.map(\.isCurrent) == [true, false, false])
         #expect(rows[0].session == Meter(fraction: 0.62, text: "62%", atLimit: false, reset: "1h"))
         #expect(rows[0].week == Meter(fraction: 0.81, text: "81%", atLimit: false,
@@ -85,7 +85,7 @@ struct PanelStateTests {
 
     // AC8: a reached limit turns red and shows when it resets.
     @Test func reachedLimitIsMarkedWithTheTimeUntilItResets() {
-        let row = state().rows[2]
+        let row = state().rows[1]
 
         #expect(row.session.atLimit)
         #expect(!row.week.atLimit)
@@ -102,8 +102,8 @@ struct PanelStateTests {
 
         #expect(rows[0].session.reset == nil)
         #expect(rows[0].week.reset == UsageText.resetLabel(now.addingTimeInterval(2 * 86_400 + 4 * 3600), from: now))
-        #expect(rows[1].session.reset == nil)
-        #expect(rows[1].week.reset == nil)
+        #expect(rows[2].session.reset == nil)
+        #expect(rows[2].week.reset == nil)
     }
 
     // AC8: a failed fetch shows dashes, empty bars and the reason on hover.
@@ -111,7 +111,7 @@ struct PanelStateTests {
         var entries = usage
         entries[ClaudeFixture.b] = UsageEntry(failure: .offline, lastAttempt: now)
 
-        let row = state(usage: entries).rows[1]
+        let row = state(usage: entries).rows[2]
 
         #expect(row.session == Meter(fraction: 0, text: "—", atLimit: false))
         #expect(row.week.text == "—")
@@ -126,7 +126,7 @@ struct PanelStateTests {
         #expect(SwitchDecision.onSelect(ClaudeFixture.a, current: current, working: 3) == .none)
     }
 
-    // User's choice (option C): the signed-in account sits apart, with its email; the rest keep their saved order.
+    // User's choice (option C): the signed-in account sits apart, with its email; the rest are in name order.
     @Test func signedInAccountIsSeparatedFromTheAccountsToSwitchTo() {
         let s = PanelState.make(accounts: accounts, current: Identity(account: ClaudeFixture.b, org: org),
                                 usage: usage, phase: .idle, now: now)
@@ -150,7 +150,7 @@ struct PanelStateTests {
         let s = state(.switching(accountId: ClaudeFixture.b))
 
         #expect(s.busy)
-        #expect(s.rows.map(\.isTarget) == [false, true, false])
+        #expect(s.rows.map(\.isTarget) == [false, false, true])
         #expect(s.rows.map(\.isDisabled) == [true, true, true])
     }
 
@@ -186,5 +186,85 @@ struct PanelStateTests {
     // "⋯" menu: the time of the last refresh.
     @Test func lastRefreshTimeReadsInMinutes() {
         #expect(state().updated == "updated 1 min ago")
+    }
+
+    // MARK: switch-to order (docs/specs/switch-to-order)
+
+    func named(_ names: [(String, String)], usage: [String: UsageEntry] = [:], current: String? = nil) -> PanelState {
+        let accounts = names.map { id, name in
+            SavedAccount(accountId: id, orgId: org, email: nil, orgName: name, savedAt: 1, addedAt: 1,
+                         signIn: SignIn(config: [:], cookieSchema: 24, cookies: []))
+        }
+        return PanelState.make(accounts: accounts, current: current.map { Identity(account: $0, org: org) },
+                               usage: usage, phase: .idle, now: now)
+    }
+
+    func id(_ n: Int) -> String { String(format: "dddddddd-0000-4000-8000-%012d", n) }
+
+    func weekEntry(session: Double = 10, week: Double, weekReset: TimeInterval? = 86_400, models: [Usage.ModelLimit] = []) -> UsageEntry {
+        UsageEntry(usage: Usage(session: .init(used: session, resetsAt: now.addingTimeInterval(3600)),
+                                week: .init(used: week, resetsAt: weekReset.map(now.addingTimeInterval)), models: models), checked: now)
+    }
+
+    // AC1, AC1a: case-insensitive, numbers by value.
+    @Test func switchToIsInNameOrderWithNumbersByValue() {
+        let plain = named([(id(1), "Studio"), (id(2), "Acme"), (id(3), "personal")])
+        #expect(plain.switchTo.map(\.name) == ["Acme", "personal", "Studio"])
+
+        let numbered = named([(id(1), "toycrane 2"), (id(2), "toycrane 10"), (id(3), "toycrane"), (id(4), "toycrane 1")])
+        #expect(numbered.switchTo.map(\.name) == ["toycrane", "toycrane 1", "toycrane 2", "toycrane 10"])
+    }
+
+    // AC2, AC3: Week at 100% before its reset goes to the bottom group, in name order, with its reset.
+    @Test func weekAtLimitMovesToTheBottomGroupInNameOrder() {
+        let s = named([(id(1), "Zed"), (id(2), "Beta"), (id(3), "Alpha")],
+                      usage: [id(1): weekEntry(week: 100), id(2): weekEntry(week: 100), id(3): weekEntry(week: 20)])
+
+        #expect(s.switchTo.map(\.name) == ["Alpha"])
+        #expect(s.weekLimitReached.map(\.name) == ["Beta", "Zed"])
+        #expect(s.weekLimitReached[0].week.reset == UsageText.resetLabel(now.addingTimeInterval(86_400), from: now))
+    }
+
+    // AC4, AC5, AC6: only Week counts.
+    @Test func sessionModelAndUnknownUsageStayInTheMainList() {
+        let fable = [Usage.ModelLimit(name: "Fable", bucket: .init(used: 100, resetsAt: now.addingTimeInterval(86_400)))]
+        let s = named([(id(1), "Session"), (id(2), "Model"), (id(3), "Failed"), (id(4), "Never")],
+                      usage: [id(1): weekEntry(session: 100, week: 62), id(2): weekEntry(week: 40, models: fable),
+                              id(3): UsageEntry(usage: Usage(session: nil, week: .init(used: 100, resetsAt: now.addingTimeInterval(86_400))),
+                                                failure: .offline, lastAttempt: now)])
+
+        #expect(s.weekLimitReached.isEmpty)
+        #expect(s.switchTo.count == 4)
+        #expect(s.rows.first { $0.name == "Session" }?.session.atLimit == true)
+        #expect(s.rows.first { $0.name == "Failed" }?.week.text == "—")
+    }
+
+    // AC7 and AC9: no group without an out-of-Week account; a passed (or unknown) reset puts it back at once.
+    @Test func resetTimePassedOrUnknownKeepsTheAccountInTheMainList() {
+        let passed = named([(id(1), "A")], usage: [id(1): weekEntry(week: 100, weekReset: -1)])
+        #expect(passed.weekLimitReached.isEmpty && passed.switchTo.count == 1)
+
+        let unknown = named([(id(1), "A")], usage: [id(1): weekEntry(week: 100, weekReset: nil)])
+        #expect(unknown.weekLimitReached.isEmpty)
+
+        // The same data a minute before the reset is out of Week.
+        let before = named([(id(1), "A")], usage: [id(1): weekEntry(week: 100, weekReset: 60)])
+        #expect(before.weekLimitReached.count == 1 && before.switchTo.isEmpty)
+    }
+
+    // AC10: the signed-in account stays under "Signed in" even at Week 100%.
+    @Test func signedInAccountStaysUpTopAtWeekLimit() {
+        let s = named([(id(1), "A"), (id(2), "B")], usage: [id(1): weekEntry(week: 100), id(2): weekEntry(week: 100)], current: id(1))
+
+        #expect(s.signedIn?.name == "A")
+        #expect(s.switchTo.isEmpty)
+        #expect(s.weekLimitReached.map(\.name) == ["B"])
+    }
+
+    // AC11: the "Remove account ›" menu reads state.rows, which is in name order.
+    @Test func rowsAreInNameOrderForTheRemoveMenu() {
+        let s = named([(id(1), "b 10"), (id(2), "b 9"), (id(3), "A")], usage: [id(1): weekEntry(week: 100)])
+
+        #expect(s.rows.map(\.name) == ["A", "b 9", "b 10"])
     }
 }

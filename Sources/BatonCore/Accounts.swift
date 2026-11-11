@@ -105,6 +105,22 @@ public func displayNames(_ accounts: [SavedAccount]) -> [String: String] {
     return names
 }
 
+/// Finder-style name order: case-insensitive, numbers compared by value ("toycrane 2" before "toycrane 10").
+/// Ties (which display names rule out) fall back to the account id so the order is stable.
+public func nameOrder(_ a: (name: String, id: String), _ b: (name: String, id: String)) -> Bool {
+    switch a.name.localizedStandardCompare(b.name) {
+    case .orderedAscending: return true
+    case .orderedDescending: return false
+    case .orderedSame: return a.id < b.id
+    }
+}
+
+/// Accounts by display name, the order the panel, the "Remove account ›" menu, and `accounts` use.
+public func sortedByName(_ accounts: [SavedAccount]) -> [SavedAccount] {
+    let names = displayNames(accounts)
+    return accounts.sorted { nameOrder((names[$0.accountId] ?? "", $0.accountId), (names[$1.accountId] ?? "", $1.accountId)) }
+}
+
 func writePrivate(_ data: Data, to url: URL) throws {
     let fm = FileManager.default
     let dir = url.deletingLastPathComponent()

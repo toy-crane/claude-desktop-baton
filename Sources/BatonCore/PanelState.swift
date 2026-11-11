@@ -51,6 +51,8 @@ public struct AccountRow: Equatable, Sendable, Identifiable {
     public let email: String?
     /// The Claude Code CLI is signed in to this account.
     public var isCLI = false
+    /// The last fetched Week limit is at 100% and has not reset yet. Session and model limits do not count.
+    public var isOutOfWeek = false
 }
 
 public enum SwitchDecision: Equatable, Sendable {
@@ -138,8 +140,10 @@ public struct PanelState: Equatable, Sendable {
     public let rows: [AccountRow]
     /// The signed-in account, shown apart at the top; nil when it is not saved.
     public var signedIn: AccountRow? { rows.first(where: \.isCurrent) }
-    /// Every other saved account, in the order they were saved.
-    public var switchTo: [AccountRow] { rows.filter { !$0.isCurrent } }
+    /// Every other saved account that still has Week left, by name.
+    public var switchTo: [AccountRow] { rows.filter { !$0.isCurrent && !$0.isOutOfWeek } }
+    /// Every other saved account whose Week limit is used up, by name; shown in a group at the bottom.
+    public var weekLimitReached: [AccountRow] { rows.filter { !$0.isCurrent && $0.isOutOfWeek } }
     public let busy: Bool
     /// "updated 1 min ago", for the "⋯" menu.
     public let updated: String?
@@ -194,8 +198,10 @@ public struct PanelState: Equatable, Sendable {
                               session: meter(shown?.session), week: meter(shown?.week, weekly: true), models: models,
                               failureReason: entry?.failure?.reason,
                               tooltip: tooltip.joined(separator: "\n"), email: account.email,
-                              isCLI: cli?.identity.map { $0.account == account.accountId && $0.org == account.orgId } ?? false)
+                              isCLI: cli?.identity.map { $0.account == account.accountId && $0.org == account.orgId } ?? false,
+                              isOutOfWeek: shown?.week.map { $0.isAtLimit && ($0.resetsAt ?? .distantPast) > now } ?? false)
         }
+        .sorted { nameOrder(($0.name, $0.id), ($1.name, $1.id)) }
 
         let checked = usage.values.compactMap(\.checked).max()
         let updated = checked.map { date -> String in
