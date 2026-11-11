@@ -267,4 +267,18 @@ struct PanelStateTests {
 
         #expect(s.rows.map(\.name) == ["A", "b 9", "b 10"])
     }
+
+    // AC2 (hover and CLI tag): a one-line row carries the same hover text and CLI flag a full block would.
+    @Test func outOfWeekRowKeepsItsHoverTextAndCLITag() {
+        let accounts = [SavedAccount(accountId: id(1), orgId: org, email: "a@example.com", orgName: "A", savedAt: 1, addedAt: 1,
+                                     signIn: SignIn(config: [:], cookieSchema: 24, cookies: []))]
+        func row(week: Double) -> AccountRow {
+            PanelState.make(accounts: accounts, current: nil, usage: [id(1): weekEntry(week: week)], phase: .idle, now: now,
+                            cli: .account(Identity(account: id(1), org: org)), cliSaved: [id(1)]).rows[0]
+        }
+
+        #expect(row(week: 100).isOutOfWeek && !row(week: 99).isOutOfWeek)
+        #expect(row(week: 100).isCLI)
+        #expect(row(week: 100).tooltip == row(week: 99).tooltip)
+    }
 }
