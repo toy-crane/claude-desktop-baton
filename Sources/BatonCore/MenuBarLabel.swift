@@ -94,13 +94,16 @@ public struct MenuBarUsage: Hashable, Sendable {
 public enum MenuBarLabel: Hashable, Sendable {
     /// The baton alone: nothing to show usage for.
     case icon
-    /// A switch or an account add is in progress.
+    /// A switch, or the app's own part of an account add, is in progress: the icon turns.
     case switching
     case usage(MenuBarUsage)
 
-    /// With `content` set to the icon alone, usage is never shown.
+    /// With `content` set to the icon alone, usage is never shown. An add that is only waiting for the
+    /// user to sign in (`waitingForSignIn`) is not the app working, so it shows the baton, not the spinner.
     public static func make(accounts: [SavedAccount], current: Identity?, usage: [String: UsageEntry],
-                            phase: Phase, now: Date, content: MenuBarContent = .usage) -> MenuBarLabel {
+                            phase: Phase, now: Date, content: MenuBarContent = .usage,
+                            waitingForSignIn: Bool = false) -> MenuBarLabel {
+        if phase == .adding, waitingForSignIn { return .icon }
         guard phase == .idle else { return .switching }
         guard content != .icon, let current, accounts.contains(where: { $0.accountId == current.account }) else { return .icon }
         let name = "Claude Desktop Baton"

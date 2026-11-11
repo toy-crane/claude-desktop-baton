@@ -43,7 +43,7 @@ final class PanelModel {
     var isBusy: Bool { state.busy || updater.isInstalling }
     var menuBar: MenuBarLabel {
         MenuBarLabel.make(accounts: accounts, current: current, usage: usage, phase: phase, now: now,
-                          content: menuBarStyle.content)
+                          content: menuBarStyle.content, waitingForSignIn: addingSince != nil)
     }
 
     func setMenuBarStyle(_ style: MenuBarStyle) {

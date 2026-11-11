@@ -15,12 +15,14 @@ struct MenuBarLabelTests {
         }
     }
 
-    func label(_ entry: UsageEntry?, phase: Phase = .idle, current: String? = ClaudeFixture.a) -> MenuBarLabel {
+    func label(_ entry: UsageEntry?, phase: Phase = .idle, current: String? = ClaudeFixture.a,
+               waitingForSignIn: Bool = false) -> MenuBarLabel {
         var usage: [String: UsageEntry] = [ClaudeFixture.b: UsageEntry(usage: Usage(session: .init(used: 5, resetsAt: nil),
                                                                                     week: .init(used: 5, resetsAt: nil)))]
         usage[ClaudeFixture.a] = entry
         return MenuBarLabel.make(accounts: accounts, current: current.map { Identity(account: $0, org: org) },
-                                 usage: usage, phase: phase, now: now)
+                                 usage: usage, phase: phase, now: now,
+                                 waitingForSignIn: waitingForSignIn)
     }
 
     func entry(session: Double, sessionReset: TimeInterval? = nil, week: Double, weekReset: TimeInterval? = nil,
@@ -74,6 +76,15 @@ struct MenuBarLabelTests {
     @Test func switchingOrAddingShowsTheSpinner() {
         #expect(label(entry(session: 42, week: 18), phase: .switching(accountId: ClaudeFixture.b)) == .switching)
         #expect(label(entry(session: 42, week: 18), phase: .adding) == .switching)
+    }
+
+    // docs/specs/switch-spinner/spec.md, AC5: an add waiting for the user to sign in is shown as idle with no account.
+    @Test func anAddWaitingForSignInShowsTheBatonNotTheSpinner() {
+        #expect(label(entry(session: 42, week: 18), phase: .adding, waitingForSignIn: true) == .icon)
+        #expect(label(entry(session: 42, week: 18), phase: .adding, current: nil, waitingForSignIn: true) == .icon)
+        // While the app itself works, the spinner stays; the flag only matters during an add.
+        #expect(label(entry(session: 42, week: 18), phase: .adding, waitingForSignIn: false) == .switching)
+        #expect(label(entry(session: 42, week: 18), phase: .switching(accountId: ClaudeFixture.b), waitingForSignIn: true) == .switching)
     }
 
     // AC7: a failed refresh keeps the last values, dimmed.
