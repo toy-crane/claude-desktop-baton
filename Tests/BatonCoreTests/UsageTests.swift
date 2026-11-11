@@ -82,7 +82,7 @@ struct UsageTests {
 
         #expect(usage.models.map(\.name) == ["Fable", "Orion"])
         #expect(usage.models[0].bucket.used == 24)
-        #expect(usage.models[0].bucket.resetsAt == Date(timeIntervalSince1970: 1_793_836_800))
+        #expect(usage.models[0].bucket.resetsAt == Date(timeIntervalSince1970: 1_794_182_400))
         #expect(usage.models[0].allowancePercent == 50)
         #expect(usage.models[1].allowancePercent == nil)
         #expect(usage.session?.used == 10 && usage.week?.used == 48)
