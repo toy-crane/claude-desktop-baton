@@ -41,6 +41,8 @@ struct PanelView: View {
     var actions = PanelActions()
     /// Image snapshots cannot draw AppKit-backed menus; they show the menu's own label instead.
     var forSnapshot = false
+    /// The account the pointer is over and would switch to; its hover highlight hides the hairlines around it.
+    @State private var highlighted: String?
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -55,9 +57,10 @@ struct PanelView: View {
             if !state.switchTo.isEmpty {
                 SectionLabel(text: "Switch to", palette: p)
             }
-            VStack(spacing: PanelSpacing.tight) {
-                ForEach(state.switchTo) { row in
-                    AccountBlock(row: row, actions: actions)
+            VStack(spacing: PanelSpacing.blocks) {
+                ForEach(Array(state.switchTo.enumerated()), id: \.element.id) { index, row in
+                    AccountBlock(row: row, actions: actions, highlighted: $highlighted,
+                                 divider: index > 0 && highlighted != row.id && highlighted != state.switchTo[index - 1].id)
                 }
                 if state.rows.isEmpty {
                     Text("No saved accounts yet. Sign in to Claude, or add an account.")
@@ -199,23 +202,34 @@ enum PanelSpacing {
     static let inset: CGFloat = 10
     /// Between a limit's text and its bar, a name and its email, and one block and the next.
     static let tight: CGFloat = 4
-    /// Between a name and the first limit, and between limits.
+    /// Between a name and the row of limit columns.
     static let gap: CGFloat = 8
+    /// Between limit columns.
+    static let columnGap: CGFloat = 10
+    /// Between one account block and the next, where a hairline sits.
+    static let blocks: CGFloat = 2
+    /// The most limit columns in a row; further limits wrap to the next row.
+    static let maxColumns = 3
 }
 
 struct AccountBlock: View {
     let row: AccountRow
     let actions: PanelActions
     var prominent = false
-    @State private var hovering = false
+    /// The id of the account whose highlight is showing; set while the pointer is over this block.
+    var highlighted: Binding<String?> = .constant(nil)
+    /// Draws a hairline along the block's top edge, separating it from the account above.
+    var divider = false
     @Environment(\.colorScheme) private var scheme
+
+    private var canSwitch: Bool { !row.isDisabled && !row.isCurrent }
 
     var body: some View {
         let p = Palette(scheme)
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 if row.isTarget { lead(p) }
-                Text(row.name).font(.system(size: prominent ? 15 : 13, weight: prominent ? .semibold : .medium))
+                Text(row.name).font(.system(size: prominent ? 15 : 13.5, weight: .semibold))
                     .lineLimit(1).truncationMode(.tail)
                 if row.isCLI {
                     Text("CLI").font(.system(size: 9.5, weight: .semibold, design: .monospaced)).foregroundStyle(p.muted)
@@ -232,17 +246,21 @@ struct AccountBlock: View {
                 Text(email).font(.system(size: 11.5)).foregroundStyle(p.muted).lineLimit(1)
                     .padding(.top, PanelSpacing.tight)
             }
-            limit("5-hour limit", row.session, p).padding(.top, PanelSpacing.gap)
-            limit("Weekly", row.week, p).padding(.top, PanelSpacing.gap)
-            ForEach(Array(row.models.enumerated()), id: \.offset) { _, model in
-                limit(model.name, model.meter, p).padding(.top, PanelSpacing.gap)
-            }
+            columns(p).padding(.top, PanelSpacing.gap)
         }
         .padding(PanelSpacing.inset)
-        .background(RoundedRectangle(cornerRadius: 8).fill(hovering && !row.isCurrent && !row.isDisabled ? p.hover : .clear))
+        .background(RoundedRectangle(cornerRadius: 8).fill(highlighted.wrappedValue == row.id ? p.hover : .clear))
+        .overlay(alignment: .top) {
+            if divider {
+                Rectangle().fill(p.border).frame(height: 1).padding(.horizontal, PanelSpacing.inset).offset(y: -1)
+            }
+        }
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
-        .onTapGesture { if !row.isDisabled && !row.isCurrent { actions.select(row.id) } }
+        .onHover { inside in
+            if inside && canSwitch { highlighted.wrappedValue = row.id }
+            else if highlighted.wrappedValue == row.id { highlighted.wrappedValue = nil }
+        }
+        .onTapGesture { if canSwitch { actions.select(row.id) } }
         .help(row.tooltip)
         .opacity(row.isDisabled && !row.isTarget ? 0.4 : 1)
     }
@@ -255,24 +273,33 @@ struct AccountBlock: View {
         }
     }
 
-    /// The limit's name, when it resets and the percent used on one line; its bar underneath.
-    private func limit(_ label: String, _ meter: Meter, _ p: Palette) -> some View {
-        VStack(alignment: .leading, spacing: PanelSpacing.tight) {
-            HStack(spacing: 8) {
-                Text(label).font(.system(size: 12.5)).lineLimit(1)
-                Spacer(minLength: 6)
-                // The reset sits close to the percent; the percent has just the width "100%" needs, so every
-                // reset ends at the same place without a wide gap after a short percent.
-                HStack(spacing: 4) {
-                    if let reset = meter.reset {
-                        Text("↻ \(reset)").font(.system(size: 11.5)).monospacedDigit().foregroundStyle(p.muted).lineLimit(1)
+    /// Session, Week, then each model limit, side by side in equal-width columns; more than
+    /// `maxColumns` wrap to a further row with the same column width.
+    private func columns(_ p: Palette) -> some View {
+        let limits: [(label: String, meter: Meter)] = [("Session", row.session), ("Week", row.week)]
+            + row.models.map { ($0.name, $0.meter) }
+        let perRow = min(limits.count, PanelSpacing.maxColumns)
+        let rows = stride(from: 0, to: limits.count, by: perRow).map { Array(limits[$0..<min($0 + perRow, limits.count)]) }
+        return VStack(alignment: .leading, spacing: PanelSpacing.gap) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, chunk in
+                HStack(alignment: .top, spacing: PanelSpacing.columnGap) {
+                    ForEach(Array(chunk.enumerated()), id: \.offset) { _, limit in
+                        column(limit.label, limit.meter, p)
                     }
-                    Text(meter.text).font(.system(size: 12.5)).monospacedDigit()
-                        .foregroundStyle(meter.atLimit ? p.danger : p.ink)
-                        .lineLimit(1)
-                        .frame(width: 36, alignment: .trailing)
+                    ForEach(0..<(perRow - chunk.count), id: \.self) { _ in Color.clear.frame(maxWidth: .infinity, maxHeight: 0) }
                 }
             }
+        }
+    }
+
+    /// One limit: a small uppercase label, the percent used, its bar, and when it resets.
+    private func column(_ label: String, _ meter: Meter, _ p: Palette) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(label.uppercased()).font(.system(size: 9.5, weight: .semibold)).tracking(0.5)
+                .foregroundStyle(p.muted).lineLimit(1).truncationMode(.tail)
+            Text(meter.text).font(.system(size: 15, weight: .medium)).monospacedDigit()
+                .foregroundStyle(meter.atLimit ? p.danger : p.ink).lineLimit(1)
+                .padding(.top, 1).padding(.bottom, PanelSpacing.tight)
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule().fill(p.track)
@@ -280,7 +307,12 @@ struct AccountBlock: View {
                 }
             }
             .frame(height: 4)
+            if let reset = meter.reset {
+                Text("\u{21BB} \(reset)").font(.system(size: 10.5)).monospacedDigit().foregroundStyle(p.muted)
+                    .lineLimit(1).truncationMode(.tail).padding(.top, PanelSpacing.tight)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
