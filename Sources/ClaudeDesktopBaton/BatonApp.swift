@@ -28,8 +28,7 @@ struct BatonApp: App {
         } label: {
             switch model.menuBar {
             case .switching:
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .symbolEffect(.rotate, isActive: true)
+                Image(nsImage: AppIcon.spinner[model.spinnerFrame % AppIcon.spinnerFrameCount])
                     .accessibilityLabel("Claude Desktop Baton: switching")
             case .icon:
                 Image(nsImage: updateDot ? AppIcon.menuBarWithDot : AppIcon.menuBar)

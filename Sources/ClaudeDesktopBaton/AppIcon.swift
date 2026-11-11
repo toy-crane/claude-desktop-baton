@@ -92,4 +92,26 @@ extension AppIcon {
         image.accessibilityDescription = dot ? "Claude Desktop Baton: update available" : "Claude Desktop Baton"
         return image
     }
+
+    /// Frames of the turning-arrows icon, one full clockwise turn. `MenuBarExtra` flattens a label
+    /// into one still image, so a symbol effect never moves there; the label swaps these images instead.
+    static let spinnerFrameCount = 10
+    static let spinner: [NSImage] = (0..<spinnerFrameCount).map { spinnerImage(turn: Double($0) / Double(spinnerFrameCount)) }
+
+    private static func spinnerImage(turn: Double) -> NSImage {
+        let configuration = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+        let symbol = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration)
+        // A fixed canvas, so the item keeps one width whatever the angle.
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+            guard let symbol, let context = NSGraphicsContext.current?.cgContext else { return false }
+            context.translateBy(x: rect.midX, y: rect.midY)
+            context.rotate(by: -turn * 2 * .pi)   // negative: clockwise in a bottom-left-origin context
+            let size = symbol.size
+            symbol.draw(in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
 }
