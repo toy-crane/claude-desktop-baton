@@ -50,9 +50,12 @@ Out:
 ## Behavior
 
 1. **Name order** — accounts under "Switch to" are sorted by their display
-   name (the name the panel shows, e.g. "Acme · sam", "Personal"), ignoring
-   letter case, in the user's language order. Accounts with the same display
-   name cannot occur (display names are already made unique).
+   name (the name the panel shows, e.g. "Acme · sam", "Personal"), the way
+   Finder sorts file names: letter case is ignored, and numbers inside a name
+   compare by value, so "toycrane", "toycrane 1", "toycrane 2", "toycrane 3",
+   "toycrane 4", … "toycrane 10" (a name comes before the same name followed
+   by a number, and 10 after 9). Accounts with the same display name cannot
+   occur (display names are already made unique).
 2. **Out of Week** — an account is out of Week when its last successfully
    fetched Week limit is at 100% and its Week reset time has not passed yet.
    Nothing else counts:
@@ -93,6 +96,9 @@ Out:
 
 1. With other accounts "Studio", "Acme · sam", and "personal" (none out of
    Week), "Switch to" shows "Acme · sam", "personal", "Studio".
+1a. With other accounts "toycrane 2", "toycrane 10", "toycrane", "toycrane 1"
+   (none out of Week), "Switch to" shows "toycrane", "toycrane 1",
+   "toycrane 2", "toycrane 10".
 2. With "Acme · jordan" at Week 100% resetting Fri 9:18 PM, it appears under
    "WEEK LIMIT REACHED" at the bottom as one line reading "Acme · jordan" and
    "↻ Fri 9:18 PM", with no bars.
