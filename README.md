@@ -12,7 +12,7 @@ account you switch to, like passing a baton.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/panel-dark.png">
-    <img src="docs/images/panel-light.png" alt="The menu bar panel: the signed-in account on top with its email, and two other accounts below, each with its 5-hour and weekly limits: the percent used, when each resets, and a bar; one account's 5-hour limit is reached and shown in red." width="300">
+    <img src="docs/images/panel-light.png" alt="The menu bar panel: the signed-in account on top with its email, and two other accounts below, each with its session and week limits side by side: the percent used, a bar, and when each resets; one account's session limit is reached and shown in red." width="300">
   </picture>
 </p>
 
