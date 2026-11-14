@@ -28,3 +28,8 @@ _Avoid_: RC session, bridge session
 **Update notice**:
 The dot on the menu bar item (the baton or the usage meter) and the "Update available" row in the panel that say a newer version of this app is ready to install; separate from Sparkle's update window, which opens only from it or from Check for Updates.
 _Avoid_: Update alert, update popup
+
+**Limit reset**:
+A grant Claude gives to an eligible account that can be used to restore the
+usage specified by that grant. It has its own availability, remaining uses,
+and optional expiry, separate from a usage limit's scheduled reset.
