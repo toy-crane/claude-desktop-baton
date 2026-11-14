@@ -8,12 +8,14 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var body = Data()
     nonisolated(unsafe) static var contentType = "application/json"
     nonisolated(unsafe) static var requests: [URLRequest] = []
+    nonisolated(unsafe) static var resetQueryStatus: Int?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         Self.requests.append(request)
-        let response = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: "HTTP/1.1",
+        let status = request.url?.query == nil ? Self.status : (Self.resetQueryStatus ?? Self.status)
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
                                        headerFields: ["Content-Type": Self.contentType])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Self.body)
@@ -32,6 +34,7 @@ struct UsageClientTests {
 
     func client() -> UsageClient {
         StubProtocol.requests = []
+        StubProtocol.resetQueryStatus = nil
         return UsageClient(protocolClasses: [StubProtocol.self], userAgent: "test", key: { Data(count: 16) })
     }
 
@@ -47,6 +50,44 @@ struct UsageClientTests {
         #expect(result == .success(Usage(session: .init(used: 8, resetsAt: nil), week: .init(used: 34, resetsAt: nil))))
         #expect(StubProtocol.requests.first?.url?.absoluteString == "https://claude.ai/api/organizations/\(org)/usage")
         #expect(StubProtocol.requests.first?.value(forHTTPHeaderField: "Cookie") == "sessionKey=sk")
+    }
+
+    @Test func panelUsageRequestsReadOnlyResetInventoryWithTheSameSession() async throws {
+        let client = client()
+        StubProtocol.status = 200
+        StubProtocol.contentType = "application/json"
+        StubProtocol.body = Data(#"""
+        {"five_hour":{"utilization":8},
+         "cedar_ember":{"grants":[
+           {"label":"One full limit reset","resets_left":1,"usable_now":true,"clears":["five_hour","seven_day"],"ends_at":"2026-12-10T22:00:00+00:00"},
+           {"label":"One Fable reset","resets_left":1,"usable_now":true,"clears":["five_hour","seven_day_overage_included"]}
+         ]}}
+        """#.utf8)
+
+        let usage = try await client.usage(orgId: org, signIn: signIn, includeLimitResets: true).get()
+
+        #expect(usage.session?.used == 8)
+        #expect(usage.limitResets?.map(\.name) == ["Full reset", "Fable reset"])
+        #expect(usage.limitResets?.map(\.remaining) == [1, 1])
+        #expect(usage.limitResets?.first?.expiresAt == Date(timeIntervalSince1970: 1_796_940_000))
+        #expect(StubProtocol.requests.map(\.httpMethod) == ["GET"])
+        #expect(StubProtocol.requests.first?.url?.absoluteString == "https://claude.ai/api/organizations/\(org)/usage?cedar_ember=1&skip_spend=1")
+        #expect(StubProtocol.requests.first?.value(forHTTPHeaderField: "Cookie") == "sessionKey=sk")
+    }
+
+    @Test func rejectedResetQueryFallsBackToOrdinaryUsage() async throws {
+        let client = client()
+        StubProtocol.status = 200
+        StubProtocol.resetQueryStatus = 400
+        StubProtocol.contentType = "application/json"
+        StubProtocol.body = Data(#"{"seven_day":{"utilization":34},"cedar_ember":null}"#.utf8)
+
+        let usage = try await client.usage(orgId: org, signIn: signIn, includeLimitResets: true).get()
+
+        #expect(usage.week?.used == 34)
+        #expect(usage.limitResets == nil)
+        #expect(StubProtocol.requests.count == 2)
+        #expect(StubProtocol.requests.last?.url?.query == nil)
     }
 
     // AC8: a failed fetch carries the reason shown on hover.

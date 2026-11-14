@@ -142,7 +142,7 @@ final class PanelModel {
             let signIn = account.accountId == current?.account ? ((try? SignInStore.read(claude)) ?? account.signIn) : account.signIn
             let id = account.accountId, org = account.orgId
             Task {
-                let result = await client.usage(orgId: org, signIn: signIn)
+                let result = await client.usage(orgId: org, signIn: signIn, includeLimitResets: true)
                 var entry = usage[id] ?? UsageEntry()
                 switch result {
                 case .success(let value):

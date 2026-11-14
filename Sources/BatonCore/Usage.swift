@@ -27,9 +27,18 @@ public struct Usage: Equatable, Sendable, Codable {
         }
     }
 
-    public init(session: Bucket?, week: Bucket?, models: [ModelLimit] = []) {
-        self.session = session; self.week = week; self.models = models
+    public init(session: Bucket?, week: Bucket?, models: [ModelLimit] = [], limitResets: [LimitReset]? = nil) {
+        self.session = session; self.week = week; self.models = models; self.limitResets = limitResets
     }
+
+    public struct LimitReset: Equatable, Sendable, Codable {
+        public let name: String
+        public let remaining: UInt32
+        public let expiresAt: Date?
+    }
+
+    /// Usable when fetched, with expiry checked again when displaying them. Nil means unavailable.
+    public let limitResets: [LimitReset]?
 
     // Saved usage from before model limits existed has no `models`; it decodes as none.
     public init(from decoder: Decoder) throws {
@@ -37,6 +46,7 @@ public struct Usage: Equatable, Sendable, Codable {
         session = try values.decodeIfPresent(Bucket.self, forKey: .session)
         week = try values.decodeIfPresent(Bucket.self, forKey: .week)
         models = try values.decodeIfPresent([ModelLimit].self, forKey: .models) ?? []
+        limitResets = try values.decodeIfPresent([LimitReset].self, forKey: .limitResets)
     }
 
     public init(json: Data) throws {
@@ -46,6 +56,40 @@ public struct Usage: Equatable, Sendable, Codable {
         session = Self.bucket(body["five_hour"])
         week = Self.bucket(body["seven_day"])
         models = Self.modelLimits(body)
+        let resetStatus = body["cedar_ember"] as? [String: Any]
+        limitResets = (resetStatus?["grants"] as? [Any])?.compactMap(Self.limitReset)
+    }
+
+    private static func limitReset(_ value: Any) -> LimitReset? {
+        guard let grant = value as? [String: Any],
+              let usable = grant["usable_now"] as? NSNumber, CFGetTypeID(usable) == CFBooleanGetTypeID(), usable.boolValue,
+              let count = grant["resets_left"] as? NSNumber, CFGetTypeID(count) != CFBooleanGetTypeID(),
+              let remaining = UInt32(exactly: count.doubleValue), remaining > 0 else { return nil }
+
+        let expiresAt: Date?
+        if let expiry = grant["ends_at"], !(expiry is NSNull) {
+            guard let stamp = expiry as? String, let parsed = date(stamp) else { return nil }
+            expiresAt = parsed
+        } else {
+            expiresAt = nil
+        }
+
+        let name: String
+        let windows = Set(grant["clears"] as? [String] ?? [])
+        switch windows {
+        case let full where full.contains("five_hour") && full.contains("seven_day"):
+            name = "Full reset"
+        case ["five_hour"]:
+            name = "5-hour reset"
+        case ["seven_day"]:
+            name = "Weekly reset"
+        case ["seven_day_overage_included"], ["five_hour", "seven_day_overage_included"]:
+            name = "Fable reset"
+        default:
+            let label = (grant["label"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            name = label.flatMap { $0.isEmpty ? nil : $0 } ?? "Limit reset"
+        }
+        return LimitReset(name: name, remaining: remaining, expiresAt: expiresAt)
     }
 
     /// `weekly_scoped` entries of `limits` that name a model. Anything unexpected here yields fewer or no

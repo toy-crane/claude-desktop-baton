@@ -52,13 +52,11 @@ account has a reset available without switching accounts or opening Claude.
 
 ## Remaining risks
 
-A signed-in browser confirmed that Claude's existing usage request returns
-grant data with its read-only reset query options. The same lookup with
-Baton's saved Desktop sign-ins is still unverified. Check this with the
-normal app before release using a saved account with a grant and one without
-a grant. The response is private to Claude's own clients. If it changes,
-usage meters should keep working. Revisit this data source if Claude offers a
-documented read API.
+The read-only reset query returned grant data in a signed-in browser and
+with four of Baton's saved Desktop sign-ins. An account without grants and
+a rejected reset query were verified with test responses. Claude does not
+document the response as a public API. If it changes, usage meters should
+keep working. Revisit this data source if Claude offers a documented read API.
 
 ## Setup before implementation
 
