@@ -59,8 +59,15 @@ public final class UsageClient: NSObject, URLSessionTaskDelegate, @unchecked Sen
         }
     }
 
-    public func usage(orgId: String, signIn: SignIn) async -> Result<Usage, UsageFailure> {
-        await get("/api/organizations/\(orgId)/usage", signIn: signIn).flatMap { data in
+    public func usage(orgId: String, signIn: SignIn, includeLimitResets: Bool = false) async -> Result<Usage, UsageFailure> {
+        let path = "/api/organizations/\(orgId)/usage"
+        if includeLimitResets,
+           case .success(let data) = await get(path + "?cedar_ember=1&skip_spend=1", signIn: signIn),
+           let usage = try? Usage(json: data) {
+            return .success(usage)
+        }
+        // If Claude rejects the reset query, the ordinary endpoint can still supply the meters.
+        return await get(path, signIn: signIn).flatMap { data in
             (try? Usage(json: data)).map(Result.success) ?? .failure(.unexpected)
         }
     }

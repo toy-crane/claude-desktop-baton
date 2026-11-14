@@ -34,6 +34,31 @@ struct PanelStateTests {
                         usage: usage ?? self.usage, phase: phase, now: now)
     }
 
+    @Test func onlyUsableUnexpiredResetsCountEvenInTheWeekLimitGroup() throws {
+        let json = Data(#"""
+        {"seven_day":{"utilization":100,"resets_at":"2026-12-10T00:00:00Z"},
+         "cedar_ember":{"grants":[
+           {"label":"Full","resets_left":2,"usable_now":true,"clears":["five_hour","seven_day"],"ends_at":"2026-12-10T00:00:00Z"},
+           {"label":"Fable","resets_left":1,"usable_now":true,"clears":["seven_day_overage_included"]},
+           {"label":"Expired","resets_left":2,"usable_now":true,"ends_at":"2026-01-01T00:00:00Z"},
+           {"label":"Cooling down","resets_left":3,"usable_now":false},
+           {"label":"Used","resets_left":0,"usable_now":true},
+           {"label":"Unknown expiry","resets_left":1,"usable_now":true,"ends_at":"invalid"}
+         ]}}
+        """#.utf8)
+        var entries = usage
+        entries[ClaudeFixture.b] = UsageEntry(usage: try Usage(json: json))
+        let panel = state(usage: entries)
+        let row = try #require(panel.weekLimitReached.first)
+
+        #expect(row.id == ClaudeFixture.b)
+        #expect(row.week.reset != nil)
+        #expect(row.limitResetCount == 3)
+        #expect(row.limitResets.map(\.name) == ["Full reset", "Fable reset"])
+        #expect(panel.signedIn?.limitResetCount == 0)
+        #expect(panel.signedIn?.week.text == "81%")
+    }
+
     // AC8 and panel layout: one block per account with Session and Week percent, current marked.
     @Test func eachAccountShowsSessionAndWeekPercentWithTheCurrentOneMarked() {
         let rows = state().rows

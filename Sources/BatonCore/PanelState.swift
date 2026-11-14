@@ -53,6 +53,8 @@ public struct AccountRow: Equatable, Sendable, Identifiable {
     public var isCLI = false
     /// The last fetched Week limit is at 100% and has not reset yet. Session and model limits do not count.
     public var isOutOfWeek = false
+    public var limitResets: [Usage.LimitReset] = []
+    public var limitResetCount: UInt64 { limitResets.reduce(0) { $0 + UInt64($1.remaining) } }
 }
 
 public enum SwitchDecision: Equatable, Sendable {
@@ -199,7 +201,8 @@ public struct PanelState: Equatable, Sendable {
                               failureReason: entry?.failure?.reason,
                               tooltip: tooltip.joined(separator: "\n"), email: account.email,
                               isCLI: cli?.identity.map { $0.account == account.accountId && $0.org == account.orgId } ?? false,
-                              isOutOfWeek: shown?.week.map { $0.isAtLimit && ($0.resetsAt ?? .distantPast) > now } ?? false)
+                              isOutOfWeek: shown?.week.map { $0.isAtLimit && ($0.resetsAt ?? .distantPast) > now } ?? false,
+                              limitResets: shown?.limitResets?.filter { ($0.expiresAt ?? .distantFuture) > now } ?? [])
         }
         .sorted { nameOrder(($0.name, $0.id), ($1.name, $1.id)) }
 

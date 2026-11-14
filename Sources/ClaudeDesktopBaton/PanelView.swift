@@ -230,35 +230,59 @@ struct AccountBlock: View {
     var highlighted: Binding<String?> = .constant(nil)
     /// Draws a hairline along the block's top edge, separating it from the account above.
     var divider = false
+    @State private var resetsExpanded = false
     @Environment(\.colorScheme) private var scheme
 
     private var canSwitch: Bool { !row.isDisabled && !row.isCurrent }
 
+    private func select() {
+        if canSwitch { actions.select(row.id) }
+    }
+
     var body: some View {
         let p = Palette(scheme)
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                if row.isTarget { lead(p) }
-                Text(row.name).font(.system(size: prominent ? 15 : 13.5, weight: .semibold))
-                    .lineLimit(1).truncationMode(.tail)
-                if row.isCLI {
-                    Text("CLI").font(.system(size: 9.5, weight: .semibold, design: .monospaced)).foregroundStyle(p.muted)
-                        .padding(.horizontal, 4).padding(.vertical, 1)
-                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(p.muted.opacity(0.6), lineWidth: 0.75))
-                        .help("The Claude Code CLI is signed in to this account.")
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 8) {
+                    if row.isTarget { lead(p) }
+                    Text(row.name).font(.system(size: prominent ? 15 : 13.5, weight: .semibold))
+                        .lineLimit(1).truncationMode(.tail)
+                    if row.isCLI {
+                        Text("CLI").font(.system(size: 9.5, weight: .semibold, design: .monospaced)).foregroundStyle(p.muted)
+                            .padding(.horizontal, 4).padding(.vertical, 1)
+                            .overlay(RoundedRectangle(cornerRadius: 3).stroke(p.muted.opacity(0.6), lineWidth: 0.75))
+                            .help("The Claude Code CLI is signed in to this account.")
+                    }
+                    if let reason = row.failureReason {
+                        Image(systemName: "exclamationmark.circle").font(.system(size: 11)).foregroundStyle(p.muted).help(reason)
+                    }
+                    Spacer(minLength: 6)
+                    if row.limitResetCount > 0 {
+                        LimitResetBadgeLabel(count: row.limitResetCount).hidden()
+                    }
                 }
-                if let reason = row.failureReason {
-                    Image(systemName: "exclamationmark.circle").font(.system(size: 11)).foregroundStyle(p.muted).help(reason)
+                if prominent, let email = row.email {
+                    Text(email).font(.system(size: 11.5)).foregroundStyle(p.muted).lineLimit(1)
+                        .padding(.top, PanelSpacing.tight)
                 }
-                Spacer(minLength: 6)
+                columns(p).padding(.top, PanelSpacing.gap)
             }
-            if prominent, let email = row.email {
-                Text(email).font(.system(size: 11.5)).foregroundStyle(p.muted).lineLimit(1)
-                    .padding(.top, PanelSpacing.tight)
+            .padding(PanelSpacing.inset)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: select)
+            .overlay(alignment: .topTrailing) {
+                if row.limitResetCount > 0 {
+                    LimitResetBadge(row: row, expanded: $resetsExpanded, palette: p)
+                        .padding(PanelSpacing.inset)
+                        .padding(.top, prominent ? 1 : 0)
+                }
             }
-            columns(p).padding(.top, PanelSpacing.gap)
+            if resetsExpanded && !row.limitResets.isEmpty {
+                LimitResetDetails(resets: row.limitResets, palette: p)
+                    .padding(.horizontal, PanelSpacing.inset)
+                    .padding(.bottom, PanelSpacing.inset)
+            }
         }
-        .padding(PanelSpacing.inset)
         .background(RoundedRectangle(cornerRadius: 8).fill(highlighted.wrappedValue == row.id ? p.hover : .clear))
         .overlay(alignment: .top) {
             if divider {
@@ -270,7 +294,10 @@ struct AccountBlock: View {
             if inside && canSwitch { highlighted.wrappedValue = row.id }
             else if highlighted.wrappedValue == row.id { highlighted.wrappedValue = nil }
         }
-        .onTapGesture { if canSwitch { actions.select(row.id) } }
+        .onDisappear { resetsExpanded = false }
+        .onChange(of: row.limitResets.isEmpty) { _, empty in
+            if empty { resetsExpanded = false }
+        }
         .help(row.tooltip)
         .opacity(row.isDisabled && !row.isTarget ? 0.4 : 1)
     }
@@ -332,37 +359,64 @@ struct WeekLimitRow: View {
     let row: AccountRow
     let actions: PanelActions
     var highlighted: Binding<String?> = .constant(nil)
+    @State private var resetsExpanded = false
     @Environment(\.colorScheme) private var scheme
 
     private var canSwitch: Bool { !row.isDisabled && !row.isCurrent }
 
+    private func select() {
+        if canSwitch { actions.select(row.id) }
+    }
+
     var body: some View {
         let p = Palette(scheme)
-        HStack(spacing: 8) {
-            if row.isTarget { Spinner(color: p.ink).frame(width: 9, height: 9).padding(.horizontal, -1.5) }
-            Text(row.name).font(.system(size: 13, weight: .regular)).foregroundStyle(p.ink.opacity(0.85))
-                .lineLimit(1).truncationMode(.tail)
-            if row.isCLI {
-                Text("CLI").font(.system(size: 9.5, weight: .semibold, design: .monospaced)).foregroundStyle(p.muted)
-                    .padding(.horizontal, 4).padding(.vertical, 1)
-                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(p.muted.opacity(0.6), lineWidth: 0.75))
-                    .help("The Claude Code CLI is signed in to this account.")
-                    .layoutPriority(1)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                if row.isTarget { Spinner(color: p.ink).frame(width: 9, height: 9).padding(.horizontal, -1.5) }
+                Text(row.name).font(.system(size: 13, weight: .regular)).foregroundStyle(p.ink.opacity(0.85))
+                    .lineLimit(1).truncationMode(.tail)
+                if row.isCLI {
+                    Text("CLI").font(.system(size: 9.5, weight: .semibold, design: .monospaced)).foregroundStyle(p.muted)
+                        .padding(.horizontal, 4).padding(.vertical, 1)
+                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(p.muted.opacity(0.6), lineWidth: 0.75))
+                        .help("The Claude Code CLI is signed in to this account.")
+                        .layoutPriority(1)
+                }
+                Spacer(minLength: 6)
+                if let reset = row.week.reset {
+                    Text("\u{21BB} \(reset)").font(.system(size: 11.5)).monospacedDigit().foregroundStyle(p.muted)
+                        .lineLimit(1).fixedSize().layoutPriority(2)
+                }
+                if row.limitResetCount > 0 {
+                    LimitResetBadgeLabel(count: row.limitResetCount).hidden()
+                }
             }
-            Spacer(minLength: 6)
-            if let reset = row.week.reset {
-                Text("\u{21BB} \(reset)").font(.system(size: 11.5)).monospacedDigit().foregroundStyle(p.muted)
-                    .lineLimit(1).fixedSize().layoutPriority(2)
+            .padding(.horizontal, PanelSpacing.inset)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: select)
+            .overlay(alignment: .trailing) {
+                if row.limitResetCount > 0 {
+                    LimitResetBadge(row: row, expanded: $resetsExpanded, palette: p)
+                        .padding(.trailing, PanelSpacing.inset)
+                }
+            }
+            if resetsExpanded && !row.limitResets.isEmpty {
+                LimitResetDetails(resets: row.limitResets, palette: p)
+                    .padding(.horizontal, PanelSpacing.inset)
+                    .padding(.bottom, 7)
             }
         }
-        .padding(.horizontal, PanelSpacing.inset).padding(.vertical, 7)
         .background(RoundedRectangle(cornerRadius: 8).fill(highlighted.wrappedValue == row.id ? p.hover : .clear))
         .contentShape(Rectangle())
         .onHover { inside in
             if inside && canSwitch { highlighted.wrappedValue = row.id }
             else if highlighted.wrappedValue == row.id { highlighted.wrappedValue = nil }
         }
-        .onTapGesture { if canSwitch { actions.select(row.id) } }
+        .onDisappear { resetsExpanded = false }
+        .onChange(of: row.limitResets.isEmpty) { _, empty in
+            if empty { resetsExpanded = false }
+        }
         .help(row.tooltip)
         .opacity(row.isDisabled && !row.isTarget ? 0.4 : 1)
     }
