@@ -273,7 +273,7 @@ struct AccountBlock: View {
             .overlay(alignment: .topTrailing) {
                 if row.limitResetCount > 0 {
                     LimitResetBadge(row: row, expanded: $resetsExpanded, palette: p)
-                        .padding(PanelSpacing.inset)
+                        .padding(PanelSpacing.inset - LimitResetBadge.safeArea)
                         .padding(.top, prominent ? 1 : 0)
                 }
             }
@@ -398,7 +398,7 @@ struct WeekLimitRow: View {
             .overlay(alignment: .trailing) {
                 if row.limitResetCount > 0 {
                     LimitResetBadge(row: row, expanded: $resetsExpanded, palette: p)
-                        .padding(.trailing, PanelSpacing.inset)
+                        .padding(.trailing, PanelSpacing.inset - LimitResetBadge.safeArea)
                 }
             }
             if resetsExpanded && !row.limitResets.isEmpty {
